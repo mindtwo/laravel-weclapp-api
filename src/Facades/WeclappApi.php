@@ -5,12 +5,12 @@ namespace Mindtwo\LaravelWeclappApi\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @see \Mindtwo\LaravelWeclappApi\Skeleton
+ * @see \Mindtwo\LaravelWeclappApi\WeclappApi
  */
-class Skeleton extends Facade
+class WeclappApi extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \Mindtwo\LaravelWeclappApi\Skeleton::class;
+        return \Mindtwo\LaravelWeclappApi\WeclappApi::class;
     }
 }

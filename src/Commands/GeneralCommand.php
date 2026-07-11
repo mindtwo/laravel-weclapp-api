@@ -4,9 +4,9 @@ namespace Mindtwo\LaravelWeclappApi\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class GeneralCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'weclapp';
 
     public $description = 'My command';
 

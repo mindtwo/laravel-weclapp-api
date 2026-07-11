@@ -2,4 +2,4 @@
 
 namespace Mindtwo\LaravelWeclappApi;
 
-class Skeleton {}
+class WeclappApi {}
