@@ -1,10 +1,10 @@
 <?php
 
-namespace VendorName\Skeleton\Tests;
+namespace Mindtwo\LaravelWeclappApi\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Mindtwo\LaravelWeclappApi\SkeletonServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
-use VendorName\Skeleton\SkeletonServiceProvider;
 
 class TestCase extends Orchestra
 {

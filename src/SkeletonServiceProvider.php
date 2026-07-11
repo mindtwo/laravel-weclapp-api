@@ -1,10 +1,10 @@
 <?php
 
-namespace VendorName\Skeleton;
+namespace Mindtwo\LaravelWeclappApi;
 
+use Mindtwo\LaravelWeclappApi\Commands\SkeletonCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use VendorName\Skeleton\Commands\SkeletonCommand;
 
 class SkeletonServiceProvider extends PackageServiceProvider
 {

@@ -223,8 +223,8 @@ function getGitHubApiEndpoint(string $endpoint): ?stdClass
         curl_setopt_array($curl, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTPGET => true,
-            CURLOPT_HTTPHEADER => [
+            CURLOPT_HTTPGET        => true,
+            CURLOPT_HTTPHEADER     => [
                 'User-Agent: spatie-configure-script/1.0',
             ],
         ]);
@@ -253,8 +253,8 @@ function searchCommitsForGitHubUsername(): string
         [$name, $email] = explode(':', $line) + [null, null];
 
         return [
-            'name' => $name,
-            'email' => $email,
+            'name'    => $name,
+            'email'   => $email,
             'isMatch' => strtolower($name) === $authorName && ! str_contains($name, '[bot]'),
         ];
     }, $committersLines), fn ($item) => $item['isMatch']);
@@ -445,30 +445,30 @@ $files = getFilesWithPlaceholders();
 
 foreach ($files as $file) {
     replace_in_file($file, [
-        ':author_name' => $authorName,
-        ':author_username' => $authorUsername,
-        'author@domain.com' => $authorEmail,
-        ':vendor_name' => $vendorName,
-        ':vendor_slug' => $vendorSlug,
-        'VendorName' => $vendorNamespace,
-        ':package_name' => $packageName,
-        ':package_slug' => $packageSlug,
-        'Skeleton' => $className,
-        'skeleton' => $packageSlug,
+        ':author_name'         => $authorName,
+        ':author_username'     => $authorUsername,
+        'author@domain.com'    => $authorEmail,
+        ':vendor_name'         => $vendorName,
+        ':vendor_slug'         => $vendorSlug,
+        'VendorName'           => $vendorNamespace,
+        ':package_name'        => $packageName,
+        ':package_slug'        => $packageSlug,
+        'Skeleton'             => $className,
+        'skeleton'             => $packageSlug,
         'migration_table_name' => title_snake($packageSlug),
-        ':variable' => $variableName,
+        ':variable'            => $variableName,
         ':package_description' => $description,
     ]);
 
     match (true) {
-        str_contains($file, normalizePath('src/Skeleton.php')) => rename($file, normalizePath('./src/'.$className.'.php')),
-        str_contains($file, normalizePath('src/SkeletonServiceProvider.php')) => rename($file, normalizePath('./src/'.$className.'ServiceProvider.php')),
-        str_contains($file, normalizePath('src/Facades/Skeleton.php')) => rename($file, normalizePath('./src/Facades/'.$className.'.php')),
-        str_contains($file, normalizePath('src/Commands/SkeletonCommand.php')) => rename($file, normalizePath('./src/Commands/'.$className.'Command.php')),
+        str_contains($file, normalizePath('src/Skeleton.php'))                                   => rename($file, normalizePath('./src/'.$className.'.php')),
+        str_contains($file, normalizePath('src/SkeletonServiceProvider.php'))                    => rename($file, normalizePath('./src/'.$className.'ServiceProvider.php')),
+        str_contains($file, normalizePath('src/Facades/Skeleton.php'))                           => rename($file, normalizePath('./src/Facades/'.$className.'.php')),
+        str_contains($file, normalizePath('src/Commands/SkeletonCommand.php'))                   => rename($file, normalizePath('./src/Commands/'.$className.'Command.php')),
         str_contains($file, normalizePath('database/migrations/create_skeleton_table.php.stub')) => rename($file, normalizePath('./database/migrations/create_'.title_snake($packageSlugWithoutPrefix).'_table.php.stub')),
-        str_contains($file, normalizePath('config/skeleton.php')) => rename($file, normalizePath('./config/'.$packageSlugWithoutPrefix.'.php')),
-        str_contains($file, 'README.md') => remove_readme_paragraphs($file),
-        default => null,
+        str_contains($file, normalizePath('config/skeleton.php'))                                => rename($file, normalizePath('./config/'.$packageSlugWithoutPrefix.'.php')),
+        str_contains($file, 'README.md')                                                         => remove_readme_paragraphs($file),
+        default                                                                                  => null,
     };
 }
 

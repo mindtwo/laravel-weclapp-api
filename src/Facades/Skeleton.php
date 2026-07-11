@@ -1,16 +1,16 @@
 <?php
 
-namespace VendorName\Skeleton\Facades;
+namespace Mindtwo\LaravelWeclappApi\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @see \VendorName\Skeleton\Skeleton
+ * @see \Mindtwo\LaravelWeclappApi\Skeleton
  */
 class Skeleton extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \VendorName\Skeleton\Skeleton::class;
+        return \Mindtwo\LaravelWeclappApi\Skeleton::class;
     }
 }
