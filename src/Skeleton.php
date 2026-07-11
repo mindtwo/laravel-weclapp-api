@@ -1,5 +1,5 @@
 <?php
 
-namespace VendorName\Skeleton;
+namespace Mindtwo\LaravelWeclappApi;
 
 class Skeleton {}

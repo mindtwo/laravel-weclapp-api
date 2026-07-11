@@ -1,0 +1,46 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "commit": "commit",
+    "prepare": "husky",
+    "release": "concurrently \"husky\" \"node release.js\"",
+    "release-dry": "node release.js --dry-run",
+    "release-local": "concurrently \"husky\" \"node release.js --no-ci\"",
+    "test": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
+    "@commitlint/prompt-cli": "^20.5.3",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.9",
+    "concurrently": "^10.0.3",
+    "dotenv": "^17.4.2",
+    "glob": "^13.0.6",
+    "husky": "^9.1.7",
+    "semantic-release": "^25.0.6"
+  },
+  "packageManager": "pnpm@11.11.0+sha512.4463f65fd80ed80d69bc1d4bf163ee94f605c7380fc318bb5b2ebe15f8cd12d49c51a4d59e951b401e764d3b6ca751cbf51bc50ed7001a6bcb4935e684c34882",
+  "engines": {
+    "node": ">=24.18.0",
+    "pnpm": ">=11.11.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@isaacs/brace-expansion@<=5.0.0": ">=5.0.1",
+      "brace-expansion@>=4.0.0 <5.0.5": ">=5.0.5",
+      "glob@<11.1.0": ">=11.1.0",
+      "handlebars@>=4.0.0 <=4.7.8": ">=4.7.9",
+      "lodash@<=4.17.23": ">=4.18.0",
+      "lodash-es@<=4.17.23": ">=4.18.0",
+      "minimatch@>=10.0.0 <10.2.3": ">=10.2.3",
+      "picomatch@<2.3.2": ">=2.3.2",
+      "picomatch@>=4.0.0 <4.0.4": ">=4.0.4",
+      "undici@<6.24.0": ">=6.24.0",
+      "undici@>=7.0.0 <7.24.0": ">=7.24.0"
+    }
+  }
+}

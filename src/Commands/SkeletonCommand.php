@@ -1,6 +1,6 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Mindtwo\LaravelWeclappApi\Commands;
 
 use Illuminate\Console\Command;
 
