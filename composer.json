@@ -1,75 +1,108 @@
 {
-    "name": ":vendor_slug/:package_slug",
-    "description": ":package_description",
+    "name": "mindtwo/laravel-weclapp-api",
+    "description": "A PHP Composer package for Laravel, designed to seamlessly integrate Laravel applications with WeClapp's system for streamlined erp management and processing.",
     "keywords": [
-        ":vendor_name",
+        "mindtwo",
         "laravel",
-        ":package_slug"
+        "weclapp",
+        "laravel-weclapp-api"
     ],
-    "homepage": "https://github.com/:vendor_slug/:package_slug",
+    "homepage": "https://github.com/mindtwo/laravel-weclapp-api",
     "license": "MIT",
     "authors": [
         {
-            "name": ":author_name",
-            "email": "author@domain.com",
+            "name": "mindtwo GmbH",
+            "email": "info@mindtwo.de",
             "role": "Developer"
         }
     ],
     "require": {
-        "php": "^8.4",
-        "spatie/laravel-package-tools": "^1.16",
-        "illuminate/contracts": "^11.0||^12.0||^13.0"
+        "php": "^8.5",
+        "spatie/laravel-package-tools": "^1.93",
+        "illuminate/contracts": "^v13.19"
     },
     "require-dev": {
-        "laravel/pint": "^1.14",
-        "nunomaduro/collision": "^8.8",
-        "larastan/larastan": "^3.0",
-        "orchestra/testbench": "^11.0.0||^10.0.0||^9.0.0",
-        "pestphp/pest": "^4.0",
-        "pestphp/pest-plugin-arch": "^4.0",
-        "pestphp/pest-plugin-laravel": "^4.0",
+        "larastan/larastan": "^v3.10",
+        "laravel/pint": "^v1.29",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^v8.9",
+        "orchestra/testbench": "^v11.1",
+        "pestphp/pest": "^v4.7",
+        "pestphp/pest-plugin-arch": "^v4.0",
+        "pestphp/pest-plugin-faker": "^v4.0",
+        "pestphp/pest-plugin-laravel": "^v4.1",
+        "pestphp/pest-plugin-profanity": "^v4.2",
+        "pestphp/pest-plugin-type-coverage": "^v4.0",
+        "phpro/grumphp": "^v2.22",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-deprecation-rules": "^2.0",
-        "phpstan/phpstan-phpunit": "^2.0",
-        "spatie/laravel-ray": "^1.35"
+        "phpstan/phpstan-phpunit": "^2.0"
     },
     "autoload": {
         "psr-4": {
-            "VendorName\\Skeleton\\": "src/",
-            "VendorName\\Skeleton\\Database\\Factories\\": "database/factories/"
+            "Mindtwo\\LaravelWeClappApi\\": "src/",
+            "Mindtwo\\LaravelWeClappApi\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "VendorName\\Skeleton\\Tests\\": "tests/",
+            "Mindtwo\\LaravelWeClappApi\\Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/"
         }
     },
     "scripts": {
-        "post-autoload-dump": "@composer run prepare",
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "npm install",
+            "npm run build"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-laravel-weclapp-api --ansi",
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": [
+            "@composer run prepare",
+            "@php vendor/bin/testbench workbench:build --ansi"
+        ],
+        "start": [
+            "Composer\\Config::disableProcessTimeout",
+            "@composer run build",
+            "@php vendor/bin/testbench serve"
+        ],
         "analyse": "vendor/bin/phpstan analyse",
-        "test": "vendor/bin/pest",
-        "test-coverage": "vendor/bin/pest --coverage",
-        "format": "vendor/bin/pint"
+        "lint": [
+            "pint"
+        ],
+        "test": "vendor/bin/pest --no-coverage --parallel",
+        "test-coverage": "vendor/bin/pest --coverage --parallel",
+        "test-type-coverage": "vendor/bin/pest --type-coverage --parallel",
+        "test-profanity": "vendor/bin/pest --profanity --parallel",
+        "format": "vendor/bin/pint",
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@composer run prepare"
+        ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ]
     },
     "config": {
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
+            "phpro/grumphp": true,
             "phpstan/extension-installer": true
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "VendorName\\Skeleton\\SkeletonServiceProvider"
+                "Mindtwo\\LaravelWeClappApi\\WeClappApiServiceProvider"
             ],
             "aliases": {
-                "Skeleton": "VendorName\\Skeleton\\Facades\\Skeleton"
+                "WeClappClient": "Mindtwo\\LaravelWeClappApi\\Facades\\WeClappClient"
             }
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }
