@@ -2,11 +2,11 @@
 
 namespace Mindtwo\LaravelWeclappApi;
 
-use Mindtwo\LaravelWeclappApi\Commands\SkeletonCommand;
+use Mindtwo\LaravelWeclappApi\Commands\GeneralCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
-class SkeletonServiceProvider extends PackageServiceProvider
+class WeclappApiServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
@@ -20,6 +20,6 @@ class SkeletonServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasViews()
             ->hasMigration('create_migration_table_name_table')
-            ->hasCommand(SkeletonCommand::class);
+            ->hasCommand(GeneralCommand::class);
     }
 }
