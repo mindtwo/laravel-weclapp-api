@@ -54,6 +54,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Write Requests Enabled
+    |--------------------------------------------------------------------------
+    |
+    | When false, mutating requests (POST/PUT/DELETE) are suppressed and logged
+    | instead of sent; reads still go through. Defaults to live everywhere
+    | except the local and testing environments. Override with
+    | WECLAPP_WRITES_ENABLED.
+    |
+    */
+
+    'writes_enabled' => (bool) env(
+        'WECLAPP_WRITES_ENABLED',
+        ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true),
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
     | HTTP Client
     |--------------------------------------------------------------------------
     |
