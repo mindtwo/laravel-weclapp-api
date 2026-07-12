@@ -15,14 +15,14 @@ beforeEach(function () {
 
 it('syncs customers into the parties mirror table', function () {
     Http::fake(['*customer*' => Http::response(['result' => [[
-        'id'               => '12345',
-        'customerNumber'   => 'C10001',
-        'company'          => 'Test GmbH',
-        'company2'         => 'Test Title',
-        'email'            => 'test@example.com',
+        'id'                => '12345',
+        'customerNumber'    => 'C10001',
+        'company'           => 'Test GmbH',
+        'company2'          => 'Test Title',
+        'email'             => 'test@example.com',
         'responsibleUserId' => '8001',
-        'sectorId'         => '9001',
-        'lastModifiedDate' => 1700000000000,
+        'sectorId'          => '9001',
+        'lastModifiedDate'  => 1700000000000,
     ]]], 200)]);
 
     $this->artisan('weclapp:sync customers')->assertSuccessful();
