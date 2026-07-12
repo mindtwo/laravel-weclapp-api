@@ -47,7 +47,15 @@ class WeclappApiCallJob implements ShouldQueue
 
     public function handle(): void
     {
-        $client = app(WeclappClient::class)->client();
+        $api = app(WeclappClient::class);
+
+        if ($this->isMutating() && $api->writesSuppressed()) {
+            $api->recordSuppressedWrite($this->method, $this->endpoint);
+
+            return;
+        }
+
+        $client = $api->client();
 
         if (! empty($this->queryParams)) {
             $client = $client->withQueryParameters($this->queryParams);
@@ -110,6 +118,11 @@ class WeclappApiCallJob implements ShouldQueue
     public function middleware(): array
     {
         return [new RateLimited('weclapp-api-jobs')];
+    }
+
+    protected function isMutating(): bool
+    {
+        return in_array($this->method, [Request::METHOD_POST, Request::METHOD_PUT, Request::METHOD_DELETE], true);
     }
 
     /**

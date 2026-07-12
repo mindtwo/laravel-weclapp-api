@@ -8,6 +8,8 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Article;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\ArticleCategory;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\BlanketSalesOrder;
@@ -149,6 +151,12 @@ class WeclappClient
      */
     public function post(string $endpoint, array $data, bool $dryRun = false): array
     {
+        if ($this->writesSuppressed()) {
+            $this->recordSuppressedWrite('POST', $endpoint);
+
+            return [];
+        }
+
         $path = $this->path($endpoint);
 
         if ($dryRun) {
@@ -160,6 +168,33 @@ class WeclappClient
         $response->throw();
 
         return $response->json();
+    }
+
+    /**
+     * Whether mutating requests should be suppressed (logged, not sent).
+     *
+     * Defaults to allowing writes, so a missing/misconfigured flag never
+     * silently blocks production traffic — only an explicit false suppresses.
+     */
+    public function writesSuppressed(): bool
+    {
+        return config('weclapp-api.writes_enabled', true) === false;
+    }
+
+    /**
+     * Log a suppressed write and emit a completion event marked suppressed, so
+     * consumers observe the intent without any outbound traffic.
+     */
+    public function recordSuppressedWrite(string $method, string $endpoint): void
+    {
+        $channel = config('weclapp-api.logging.channel');
+
+        Log::channel(is_string($channel) && $channel !== '' ? $channel : null)->info(
+            'Weclapp write suppressed (writes disabled)',
+            ['method' => $method, 'endpoint' => $endpoint],
+        );
+
+        WeclappApiCallCompleted::dispatch($endpoint, $method, [], 200, true, true);
     }
 
     public function parties(): Party
