@@ -8,17 +8,61 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Article;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\ArticleCategory;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\BlanketSalesOrder;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Comment;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Contract;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\CostCenter;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Currency;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\CustomerCategory;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Document;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\LeadSource;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\LedgerAccount;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Opportunity;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Party;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\PaymentMethod;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseInvoice;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseOrder;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Quotation;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesInvoice;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesOrder;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesStage;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Shipment;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Tax;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\TermOfPayment;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Unit;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\User;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Warehouse;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Webhook;
 
 class WeclappClient
 {
-    protected string $baseUrl;
+    /**
+     * The shared, pre-configured HTTP client (base URL, auth header, timeouts,
+     * retry) reused by the low-level helpers, the lazy proxy and the queued job.
+     */
+    public PendingRequest $client;
 
     protected int $pageSize;
 
-    public function __construct(string $baseUrl, protected string $token)
+    public function __construct(string $baseUrl, string $token)
     {
-        $this->baseUrl = rtrim($baseUrl, '/').'/';
         $this->pageSize = (int) config('weclapp-api.page_size', 1000);
+
+        $this->client = Http::baseUrl(rtrim($baseUrl, '/').'/')
+            ->withHeaders([
+                'AuthenticationToken' => $token,
+                'Accept'              => 'application/json',
+                'Content-Type'        => 'application/json',
+            ])
+            ->timeout((int) config('weclapp-api.http.timeout', 60))
+            ->connectTimeout((int) config('weclapp-api.http.connect_timeout', 10))
+            ->retry(
+                (int) config('weclapp-api.http.retry_times', 3),
+                (int) config('weclapp-api.http.retry_sleep', 500),
+                throw: false,
+            );
     }
 
     /**
@@ -36,7 +80,7 @@ class WeclappClient
         $page = 1;
 
         do {
-            $response = $this->request()->get($this->url($endpoint), array_merge($params, [
+            $response = $this->client->get($this->path($endpoint), array_merge($params, [
                 'page'     => $page,
                 'pageSize' => $this->pageSize,
             ]));
@@ -57,66 +101,13 @@ class WeclappClient
     }
 
     /**
-     * POST data to an endpoint. When $dryRun is true Weclapp validates the
-     * payload without persisting it (server-side dry run).
-     *
-     * @param array<string, mixed> $data
-     *
-     * @throws RequestException
-     *
-     * @return array<string, mixed>
-     */
-    public function post(string $endpoint, array $data, bool $dryRun = false): array
-    {
-        $url = $this->url($endpoint);
-
-        if ($dryRun) {
-            $url .= '?dryRun=true';
-        }
-
-        $response = $this->request()->post($url, $data);
-
-        $response->throw();
-
-        return $response->json();
-    }
-
-    /**
-     * PUT (replace) a single record by id.
-     *
-     * @param array<string, mixed> $data
-     *
-     * @throws RequestException
-     *
-     * @return array<string, mixed>
-     */
-    public function put(string $endpoint, string|int $id, array $data): array
-    {
-        $response = $this->request()->put($this->url($endpoint).'/'.$id, $data);
-
-        $response->throw();
-
-        return $response->json();
-    }
-
-    /**
-     * DELETE a single record by id.
-     *
-     * @throws RequestException
-     */
-    public function delete(string $endpoint, string|int $id): void
-    {
-        $this->request()->delete($this->url($endpoint).'/'.$id)->throw();
-    }
-
-    /**
      * Fetch a single record by id. Returns null on a 404.
      *
      * @throws RequestException
      */
     public function find(string $endpoint, string|int $id): ?object
     {
-        $response = $this->request(throwOnRetry: false)->get($this->url($endpoint).'/'.$id);
+        $response = $this->client->get($this->path($endpoint).'/'.$id);
 
         if ($response->notFound()) {
             return null;
@@ -136,31 +127,175 @@ class WeclappClient
      */
     public function count(string $endpoint, array $params = []): int
     {
-        $response = $this->request()->get($this->url($endpoint).'/count', $params);
+        $response = $this->client->get($this->path($endpoint).'/count', $params);
 
         $response->throw();
 
         return (int) ($response->object()->result ?? 0);
     }
 
-    protected function request(bool $throwOnRetry = true): PendingRequest
+    /**
+     * Immediately POST data to an endpoint. When $dryRun is true Weclapp
+     * validates the payload without persisting it (server-side dry run).
+     *
+     * @param array<string, mixed> $data
+     *
+     * @throws RequestException
+     *
+     * @return array<string, mixed>
+     */
+    public function post(string $endpoint, array $data, bool $dryRun = false): array
     {
-        return Http::withHeaders([
-            'AuthenticationToken' => $this->token,
-            'Accept'              => 'application/json',
-            'Content-Type'        => 'application/json',
-        ])
-            ->timeout((int) config('weclapp-api.http.timeout', 60))
-            ->connectTimeout((int) config('weclapp-api.http.connect_timeout', 10))
-            ->retry(
-                (int) config('weclapp-api.http.retry_times', 3),
-                (int) config('weclapp-api.http.retry_sleep', 500),
-                throw: $throwOnRetry,
-            );
+        $path = $this->path($endpoint);
+
+        if ($dryRun) {
+            $path .= '?dryRun=true';
+        }
+
+        $response = $this->client->post($path, $data);
+
+        $response->throw();
+
+        return $response->json();
     }
 
-    protected function url(string $endpoint): string
+    public function parties(): Party
     {
-        return $this->baseUrl.ltrim($endpoint, '/');
+        return app(Party::class);
+    }
+
+    public function articles(): Article
+    {
+        return app(Article::class);
+    }
+
+    public function articleCategories(): ArticleCategory
+    {
+        return app(ArticleCategory::class);
+    }
+
+    public function quotations(): Quotation
+    {
+        return app(Quotation::class);
+    }
+
+    public function salesOrders(): SalesOrder
+    {
+        return app(SalesOrder::class);
+    }
+
+    public function users(): User
+    {
+        return app(User::class);
+    }
+
+    public function salesInvoices(): SalesInvoice
+    {
+        return app(SalesInvoice::class);
+    }
+
+    public function purchaseOrders(): PurchaseOrder
+    {
+        return app(PurchaseOrder::class);
+    }
+
+    public function purchaseInvoices(): PurchaseInvoice
+    {
+        return app(PurchaseInvoice::class);
+    }
+
+    public function blanketSalesOrders(): BlanketSalesOrder
+    {
+        return app(BlanketSalesOrder::class);
+    }
+
+    public function contracts(): Contract
+    {
+        return app(Contract::class);
+    }
+
+    public function opportunities(): Opportunity
+    {
+        return app(Opportunity::class);
+    }
+
+    public function units(): Unit
+    {
+        return app(Unit::class);
+    }
+
+    public function taxes(): Tax
+    {
+        return app(Tax::class);
+    }
+
+    public function paymentMethods(): PaymentMethod
+    {
+        return app(PaymentMethod::class);
+    }
+
+    public function termsOfPayment(): TermOfPayment
+    {
+        return app(TermOfPayment::class);
+    }
+
+    public function customerCategories(): CustomerCategory
+    {
+        return app(CustomerCategory::class);
+    }
+
+    public function leadSources(): LeadSource
+    {
+        return app(LeadSource::class);
+    }
+
+    public function salesStages(): SalesStage
+    {
+        return app(SalesStage::class);
+    }
+
+    public function currencies(): Currency
+    {
+        return app(Currency::class);
+    }
+
+    public function costCenters(): CostCenter
+    {
+        return app(CostCenter::class);
+    }
+
+    public function ledgerAccounts(): LedgerAccount
+    {
+        return app(LedgerAccount::class);
+    }
+
+    public function warehouses(): Warehouse
+    {
+        return app(Warehouse::class);
+    }
+
+    public function shipments(): Shipment
+    {
+        return app(Shipment::class);
+    }
+
+    public function documents(): Document
+    {
+        return app(Document::class);
+    }
+
+    public function comments(): Comment
+    {
+        return app(Comment::class);
+    }
+
+    public function webhooks(): Webhook
+    {
+        return app(Webhook::class);
+    }
+
+    protected function path(string $endpoint): string
+    {
+        return ltrim($endpoint, '/');
     }
 }
