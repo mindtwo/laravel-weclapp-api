@@ -57,4 +57,36 @@ return [
         'retry_times'     => (int) env('WECLAPP_HTTP_RETRY_TIMES', 3),
         'retry_sleep'     => (int) env('WECLAPP_HTTP_RETRY_SLEEP', 500),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queued API Calls
+    |--------------------------------------------------------------------------
+    |
+    | Endpoint write methods return a LazyResponseProxy; calling ->getJob() on
+    | it hands back an undispatched WeclappApiCallJob you can queue. These
+    | settings control the connection that job runs on and the per-minute rate
+    | limit applied to it (Weclapp throttles aggressively).
+    |
+    */
+
+    'queue_connection'      => env('WECLAPP_QUEUE_CONNECTION'),
+    'rate_limit_per_minute' => (int) env('WECLAPP_RATE_LIMIT_PER_MINUTE', 100),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Event Logging
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the package logs every WeclappApiCallCompleted event via the
+    | configured channel. Useful for auditing outbound traffic; off by default.
+    |
+    */
+
+    'logging' => [
+        'enabled'         => (bool) env('WECLAPP_LOG_EVENTS', false),
+        'level'           => env('WECLAPP_LOG_LEVEL', 'info'),
+        'channel'         => env('WECLAPP_LOG_CHANNEL'),
+        'include_payload' => (bool) env('WECLAPP_LOG_INCLUDE_PAYLOAD', false),
+    ],
 ];
