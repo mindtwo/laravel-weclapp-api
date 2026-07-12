@@ -24,7 +24,6 @@ class ArticleFactory extends Factory
             'last_modified'       => $this->faker->dateTime(),
             'name'                => $this->faker->words(3, true),
             'unit_id'             => $this->faker->numberBetween(1, 10),
-            'unit_name'           => $this->faker->randomElement(['piece', 'hour', 'month']),
             'weclapp_id'          => $this->faker->unique()->numberBetween(10000, 99999),
         ];
     }

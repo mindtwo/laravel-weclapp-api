@@ -20,7 +20,6 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->datetime('last_modified')->nullable();
             $table->string('name')->nullable();
-            $table->string('unit_name')->nullable();
             $table->timestamps();
         });
     }
