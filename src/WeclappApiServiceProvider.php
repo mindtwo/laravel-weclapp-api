@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Mindtwo\LaravelWeclappApi;
 
-use Mindtwo\LaravelWeclappApi\Commands\GeneralCommand;
+use Illuminate\Foundation\Application;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -16,10 +18,17 @@ class WeclappApiServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('skeleton')
-            ->hasConfigFile()
-            ->hasViews()
-            ->hasMigration('create_migration_table_name_table')
-            ->hasCommand(GeneralCommand::class);
+            ->name('laravel-weclapp-api')
+            ->hasConfigFile();
+    }
+
+    public function packageRegistered(): void
+    {
+        $this->app->singleton(WeclappClient::class, function (Application $app): WeclappClient {
+            return new WeclappClient(
+                (string) config('weclapp-api.base_url'),
+                (string) config('weclapp-api.token'),
+            );
+        });
     }
 }
