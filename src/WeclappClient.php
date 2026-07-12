@@ -43,12 +43,9 @@ class WeclappClient
 {
     protected string $baseUrl;
 
-    protected int $pageSize;
-
     public function __construct(string $baseUrl, protected string $token)
     {
         $this->baseUrl = rtrim($baseUrl, '/').'/';
-        $this->pageSize = (int) config('weclapp-api.page_size', 1000);
     }
 
     /**
@@ -86,13 +83,14 @@ class WeclappClient
      */
     public function get(string $endpoint, array $params = []): Collection
     {
+        $pageSize = (int) config('weclapp-api.page_size', 1000);
         $results = [];
         $page = 1;
 
         do {
             $response = $this->client()->get($this->path($endpoint), array_merge($params, [
                 'page'     => $page,
-                'pageSize' => $this->pageSize,
+                'pageSize' => $pageSize,
             ]));
 
             $response->throw();
@@ -105,7 +103,7 @@ class WeclappClient
             $results = [...$results, ...$batch];
 
             $page++;
-        } while (count($batch) >= $this->pageSize);
+        } while (count($batch) >= $pageSize);
 
         return collect($results);
     }
