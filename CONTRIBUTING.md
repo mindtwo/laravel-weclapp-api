@@ -187,104 +187,67 @@ public function methodName(int|string $paramName, array $data): \Illuminate\Http
 
 ## Adding New Endpoints
 
-When adding new Weclapp API endpoints, follow these steps:
+Every typed endpoint extends the abstract `Http\Endpoints\Endpoint` base, which
+already provides `query()` / `find()` / `count()` (reads) and `create()` /
+`update()` / `delete()` (writes) against a resource path. In the common case a
+new endpoint is a three-line subclass — you do **not** re-implement the CRUD
+methods.
 
-### 1. Create the Endpoint Class
+### 1. Create the endpoint class
 
-Create a new file in `src/Endpoints/`:
+Create a file in `src/Http/Endpoints/` that declares the Weclapp resource
+segment:
 
 ```php
 <?php
 
-namespace Mindtwo\LaravelWeclappApi\Endpoints;
+declare(strict_types=1);
 
-use Mindtwo\LaravelWeclappApi\WeclappClient;
+namespace Mindtwo\LaravelWeclappApi\Http\Endpoints;
 
-class YourEndpoint
+class SalesChannel extends Endpoint
 {
-    public function __construct(protected WeclappClient $api)
-    {
-        //
-    }
-
-    /**
-     * Method documentation here.
-     *
-     * @param int|string $id The resource ID
-     * @param array $data Request data
-     *
-     * @return \Illuminate\Http\Client\Response
-     */
-    public function create(int|string $id, array $data): \Illuminate\Http\Client\Response
-    {
-        return $this->api->client->post(
-            sprintf('/resource/%s', $id),
-            $data
-        );
-    }
+    protected string $path = 'salesChannel';
 }
 ```
 
-### 2. Follow Existing Patterns
+That is usually all that is needed. Only override or add methods for behaviour
+the base cannot express (e.g. a sub-resource action). Writes must keep returning
+a `LazyResponseProxy` (return `new LazyResponseProxy($this->api, $path, $method, body: $data)`)
+so callers keep the sync/queue/event behaviour.
 
-- **Constructor**: Always use dependency injection with `WeclappClient`
-- **HTTP Methods**: Use the client's methods (`get`, `post`, `put`, `delete`)
-- **URL Building**: Use `sprintf()` for URL construction
-- **Return Types**: Return the raw `Response` object from HTTP client
-- **Type Hints**: Use `int|string` for IDs to support both formats
+### 2. Register it
 
-### 3. Standard CRUD Methods
+- Add the class to the `ENDPOINTS` list in `WeclappApiServiceProvider` so it is
+  bound as a singleton.
+- Add an accessor to `WeclappClient` (e.g. `public function salesChannels(): SalesChannel { return app(SalesChannel::class); }`).
+- Add a matching `@method` line to the `WeclappClient` facade docblock.
 
-If creating a resource endpoint, implement these methods:
+### 3. Method contract
 
-- `index()` - List resources
-- `show($id)` - Get single resource
-- `create($parentId, $data)` - Create new resource
-- `update($id, $data)` - Update existing resource
-- `delete($id)` - Delete resource
+The inherited methods return:
 
-### 4. Add Comprehensive PHPDocs
+- `query(array $filters = []): Illuminate\Support\Collection` — all pages merged
+- `find(string|int $id): ?object` — `null` on 404
+- `count(array $filters = []): int`
+- `create(array)`, `update(string|int $id, array)`, `delete(string|int $id)` — a
+  `LazyResponseProxy`
 
-Document all parameters, especially complex arrays:
+The generic client (`WeclappClient::get()/find()/count()/post()`) already reaches
+any Weclapp resource, so a typed class is only about ergonomics and discoverability.
 
-```php
-/**
- * @param array $data Task data including:
- *                    - name (string, required): Task name
- *                    - description (string, optional): Task description
- *                    - assignees (array, optional): Array of user IDs
- */
-```
+## Adding a mirror entity or sync command
 
-### 5. Add Validation Where Needed
+To have `weclapp:sync` populate a new local table:
 
-Add validation for critical operations:
+1. Add a `weclapp_*` migration + Eloquent model + factory (mirror the existing
+   ones under `database/migrations`, `src/Models`, `database/factories`).
+2. Add a `SyncDefinition` entry to `Sync\SyncRegistry` mapping the endpoint,
+   model, the column → API-field `map`, epoch-ms `dates`, the match `key`, and
+   any static `defaults`.
 
-```php
-if (empty($data['name'])) {
-    throw new InvalidArgumentException('Name is required.');
-}
-```
-
-### 6. Update Documentation
-
-Add usage examples to the README.md:
-
-```php
-### YourEndpoint Usage
-
-Description of what this endpoint does.
-
-```php
-use Mindtwo\LaravelWeclappApi\Endpoints\YourEndpoint;
-
-$result = app(YourEndpoint::class)->create($id, [
-    'name' => 'Example',
-    'description' => 'Description here',
-]);
-```
-
-```
+No command code changes are needed — the registry drives `weclapp:sync` and
+`weclapp:update`.
 
 ## Testing
 
@@ -295,16 +258,15 @@ Create test files in the `tests/` directory:
 ```php
 <?php
 
-use Mindtwo\LaravelWeclappApi\Endpoints\YourEndpoint;
+use Illuminate\Support\Facades\Http;
+use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 
-it('can create a resource', function () {
-    $endpoint = app(YourEndpoint::class);
+it('creates a resource', function () {
+    Http::fake(['*/salesChannel' => Http::response(['id' => '1'], 201)]);
 
-    $response = $endpoint->create('123', [
-        'name' => 'Test Resource',
-    ]);
+    $response = WeclappClient::salesChannels()->create(['name' => 'Test Resource']);
 
-    expect($response)->not->toBeNull();
+    expect($response->status())->toBe(201);
 });
 ```
 
