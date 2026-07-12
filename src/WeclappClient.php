@@ -41,25 +41,20 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\Webhook;
 
 class WeclappClient
 {
-    protected string $baseUrl;
-
-    public function __construct(string $baseUrl, protected string $token)
-    {
-        $this->baseUrl = rtrim($baseUrl, '/').'/';
-    }
-
     /**
      * A freshly configured HTTP client (base URL, auth header, timeouts, retry).
      *
-     * Built per call rather than cached so it always binds to the current
-     * HTTP factory — important for Http::fake() in tests and for reuse by the
-     * lazy proxy and the queued job.
+     * Built per call from current config rather than cached so it always binds
+     * to the live HTTP factory and configuration — important for Http::fake()
+     * and config overrides in tests, and for reuse by the lazy proxy and job.
      */
     public function client(): PendingRequest
     {
-        return Http::baseUrl($this->baseUrl)
+        $baseUrl = rtrim((string) config('weclapp-api.base_url'), '/').'/';
+
+        return Http::baseUrl($baseUrl)
             ->withHeaders([
-                'AuthenticationToken' => $this->token,
+                'AuthenticationToken' => (string) config('weclapp-api.token'),
                 'Accept'              => 'application/json',
                 'Content-Type'        => 'application/json',
             ])
