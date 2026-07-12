@@ -19,7 +19,6 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleFactory;
  * @property string|null $description
  * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $name
- * @property string|null $unit_name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
@@ -38,7 +37,6 @@ class Article extends Model
         'last_modified',
         'name',
         'unit_id',
-        'unit_name',
         'weclapp_id',
     ];
 

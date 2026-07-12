@@ -18,10 +18,10 @@ use Mindtwo\LaravelWeclappApi\Models\User;
  * (addresses, contacts, bank accounts) are intentionally left to the consumer.
  *
  * Field maps validated against the official Weclapp OpenAPI 3.1 spec
- * (https://www.weclapp.com/api/openapi_v2.yaml) and the collection envelope is
- * `{ "result": [...] }`. Two deliberate exceptions: the `project` endpoint is
- * not in the public spec (production-proven only), and `article.unitName` is an
- * undocumented convenience field captured best-effort (isset-guarded).
+ * (https://www.weclapp.com/api/openapi_v2.yaml) and a live read against the
+ * production API; the collection envelope is `{ "result": [...] }`. Note: the
+ * `project` endpoint is absent from the public spec but is real and live
+ * (production-confirmed).
  */
 final class SyncRegistry
 {
@@ -83,7 +83,6 @@ final class SyncRegistry
                     'description'         => 'description',
                     'name'                => 'name',
                     'unit_id'             => 'unitId',
-                    'unit_name'           => 'unitName',
                     'weclapp_id'          => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
