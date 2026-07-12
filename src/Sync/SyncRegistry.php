@@ -16,6 +16,12 @@ use Mindtwo\LaravelWeclappApi\Models\User;
  * The set of Weclapp entities the package can sync directly from an endpoint
  * into a mirror table. Derived data (amounts, reports) and nested collections
  * (addresses, contacts, bank accounts) are intentionally left to the consumer.
+ *
+ * Field maps validated against the official Weclapp OpenAPI 3.1 spec
+ * (https://www.weclapp.com/api/openapi_v2.yaml) and the collection envelope is
+ * `{ "result": [...] }`. Two deliberate exceptions: the `project` endpoint is
+ * not in the public spec (production-proven only), and `article.unitName` is an
+ * undocumented convenience field captured best-effort (isset-guarded).
  */
 final class SyncRegistry
 {
