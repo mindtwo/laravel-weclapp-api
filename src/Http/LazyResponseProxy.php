@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Http;
 
+use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
@@ -79,6 +80,13 @@ class LazyResponseProxy
             throw new RuntimeException('Cannot execute the API call after getJob() has been called.');
         }
 
+        if ($this->isMutating() && $this->api->writesSuppressed()) {
+            $this->api->recordSuppressedWrite($this->method, $this->endpoint);
+            $this->executed = true;
+
+            return $this->response = new Response(new PsrResponse(200, [], (string) json_encode([])));
+        }
+
         $client = $this->api->client();
 
         if (! empty($this->queryParams)) {
@@ -104,6 +112,11 @@ class LazyResponseProxy
         );
 
         return $this->response;
+    }
+
+    protected function isMutating(): bool
+    {
+        return in_array($this->method, [Request::METHOD_POST, Request::METHOD_PUT, Request::METHOD_DELETE], true);
     }
 
     /**
