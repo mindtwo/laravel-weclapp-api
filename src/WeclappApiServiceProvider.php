@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Mindtwo\LaravelWeclappApi;
 
 use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Mindtwo\LaravelWeclappApi\Commands\WeclappSyncCommand;
@@ -103,12 +102,7 @@ class WeclappApiServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
-        $this->app->singleton(WeclappClient::class, function (Application $app): WeclappClient {
-            return new WeclappClient(
-                (string) config('weclapp-api.base_url'),
-                (string) config('weclapp-api.token'),
-            );
-        });
+        $this->app->singleton(WeclappClient::class);
 
         foreach (self::ENDPOINTS as $endpoint) {
             $this->app->singleton($endpoint);
