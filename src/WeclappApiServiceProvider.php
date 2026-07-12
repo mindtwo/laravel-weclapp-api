@@ -107,6 +107,8 @@ class WeclappApiServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
         RateLimiter::for('weclapp-api-jobs', function (): Limit {
             return Limit::perMinute((int) config('weclapp-api.rate_limit_per_minute', 100))->by('weclapp-api-jobs');
         });
