@@ -47,7 +47,7 @@ class WeclappApiCallJob implements ShouldQueue
 
     public function handle(): void
     {
-        $client = app(WeclappClient::class)->client;
+        $client = app(WeclappClient::class)->client();
 
         if (! empty($this->queryParams)) {
             $client = $client->withQueryParameters($this->queryParams);
