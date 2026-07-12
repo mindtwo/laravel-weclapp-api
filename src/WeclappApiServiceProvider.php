@@ -117,7 +117,12 @@ class WeclappApiServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        // Publish (rather than auto-run) so a consuming app opts in when ready.
+        // Weclapp mirror data is company-wide, so these belong on the central
+        // connection and must not collide with an app's own weclapp tables.
+        $this->publishesMigrations([
+            __DIR__.'/../database/migrations' => database_path('migrations'),
+        ], 'weclapp-api-migrations');
 
         RateLimiter::for('weclapp-api-jobs', function (): Limit {
             return Limit::perMinute((int) config('weclapp-api.rate_limit_per_minute', 100))->by('weclapp-api-jobs');
