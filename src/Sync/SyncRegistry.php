@@ -103,7 +103,7 @@ final class SyncRegistry
                     'net_amount'       => 'netAmount',
                     'quotation_number' => 'quotationNumber',
                     'status'           => 'status',
-                    'version'          => 'version',
+                    'version'          => 'quotationVersion',
                     'weclapp_id'       => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],

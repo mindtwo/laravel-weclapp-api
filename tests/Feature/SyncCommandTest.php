@@ -74,6 +74,26 @@ it('is idempotent, upserting on weclapp_id', function () {
         ->and(Article::query()->firstOrFail()->article_number)->toBe('ART-001');
 });
 
+it('maps a quotation, taking version from quotationVersion', function () {
+    Http::fake(['*quotation*' => Http::response(['result' => [[
+        'id'               => 40001,
+        'quotationNumber'  => 'QU-10001',
+        'customerId'       => 12345,
+        'grossAmount'      => 29750.00,
+        'netAmount'        => 25000.00,
+        'quotationVersion' => 3,
+        'status'           => 'OPEN',
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync quotations')->assertSuccessful();
+
+    $quotation = Quotation::query()->firstOrFail();
+
+    expect($quotation->weclapp_id)->toBe(40001)
+        ->and($quotation->quotation_number)->toBe('QU-10001')
+        ->and($quotation->version)->toBe(3);
+});
+
 it('fails on an unknown entity', function () {
     $this->artisan('weclapp:sync nope')
         ->expectsOutputToContain('Unknown entity "nope"')
