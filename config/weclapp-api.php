@@ -42,6 +42,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Weclapp returns timestamps as epoch milliseconds. The sync commands
+    | convert them to datetimes in this timezone before persisting.
+    |
+    */
+
+    'timezone' => env('WECLAPP_TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
     | HTTP Client
     |--------------------------------------------------------------------------
     |

@@ -12,6 +12,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\Comment;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Contract;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\CostCenter;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Currency;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Customer;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\CustomerCategory;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Document;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\LeadSource;
@@ -19,6 +20,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\LedgerAccount;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Opportunity;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Party;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PaymentMethod;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Project;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseInvoice;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseOrder;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Quotation;
@@ -26,6 +28,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesInvoice;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesOrder;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesStage;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Shipment;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Supplier;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Tax;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\TermOfPayment;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Unit;
@@ -40,6 +43,9 @@ use Mindtwo\LaravelWeclappApi\WeclappClient as BaseWeclappClient;
  * @method static int count(string $endpoint, array<string, mixed> $params = [])
  * @method static array<string, mixed> post(string $endpoint, array<string, mixed> $data, bool $dryRun = false)
  * @method static Party parties()
+ * @method static Customer customers()
+ * @method static Supplier suppliers()
+ * @method static Project projects()
  * @method static Article articles()
  * @method static ArticleCategory articleCategories()
  * @method static Quotation quotations()

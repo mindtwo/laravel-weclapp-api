@@ -8,6 +8,8 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
+use Mindtwo\LaravelWeclappApi\Commands\WeclappSyncCommand;
+use Mindtwo\LaravelWeclappApi\Commands\WeclappUpdateCommand;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Article;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\ArticleCategory;
@@ -16,6 +18,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\Comment;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Contract;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\CostCenter;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Currency;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Customer;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\CustomerCategory;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Document;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Endpoint;
@@ -24,6 +27,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\LedgerAccount;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Opportunity;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Party;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PaymentMethod;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Project;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseInvoice;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseOrder;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Quotation;
@@ -31,6 +35,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesInvoice;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesOrder;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesStage;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Shipment;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Supplier;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Tax;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\TermOfPayment;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Unit;
@@ -51,6 +56,9 @@ class WeclappApiServiceProvider extends PackageServiceProvider
      */
     private const array ENDPOINTS = [
         Party::class,
+        Customer::class,
+        Supplier::class,
+        Project::class,
         Article::class,
         ArticleCategory::class,
         Quotation::class,
@@ -88,7 +96,9 @@ class WeclappApiServiceProvider extends PackageServiceProvider
          */
         $package
             ->name('laravel-weclapp-api')
-            ->hasConfigFile();
+            ->hasConfigFile()
+            ->hasCommand(WeclappSyncCommand::class)
+            ->hasCommand(WeclappUpdateCommand::class);
     }
 
     public function packageRegistered(): void

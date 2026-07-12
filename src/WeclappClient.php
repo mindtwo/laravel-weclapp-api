@@ -15,6 +15,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\Comment;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Contract;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\CostCenter;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Currency;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Customer;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\CustomerCategory;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Document;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\LeadSource;
@@ -22,6 +23,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\LedgerAccount;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Opportunity;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Party;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PaymentMethod;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Project;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseInvoice;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\PurchaseOrder;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Quotation;
@@ -29,6 +31,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesInvoice;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesOrder;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\SalesStage;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Shipment;
+use Mindtwo\LaravelWeclappApi\Http\Endpoints\Supplier;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Tax;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\TermOfPayment;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Unit;
@@ -38,21 +41,28 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\Webhook;
 
 class WeclappClient
 {
-    /**
-     * The shared, pre-configured HTTP client (base URL, auth header, timeouts,
-     * retry) reused by the low-level helpers, the lazy proxy and the queued job.
-     */
-    public PendingRequest $client;
+    protected string $baseUrl;
 
     protected int $pageSize;
 
-    public function __construct(string $baseUrl, string $token)
+    public function __construct(string $baseUrl, protected string $token)
     {
+        $this->baseUrl = rtrim($baseUrl, '/').'/';
         $this->pageSize = (int) config('weclapp-api.page_size', 1000);
+    }
 
-        $this->client = Http::baseUrl(rtrim($baseUrl, '/').'/')
+    /**
+     * A freshly configured HTTP client (base URL, auth header, timeouts, retry).
+     *
+     * Built per call rather than cached so it always binds to the current
+     * HTTP factory — important for Http::fake() in tests and for reuse by the
+     * lazy proxy and the queued job.
+     */
+    public function client(): PendingRequest
+    {
+        return Http::baseUrl($this->baseUrl)
             ->withHeaders([
-                'AuthenticationToken' => $token,
+                'AuthenticationToken' => $this->token,
                 'Accept'              => 'application/json',
                 'Content-Type'        => 'application/json',
             ])
@@ -80,7 +90,7 @@ class WeclappClient
         $page = 1;
 
         do {
-            $response = $this->client->get($this->path($endpoint), array_merge($params, [
+            $response = $this->client()->get($this->path($endpoint), array_merge($params, [
                 'page'     => $page,
                 'pageSize' => $this->pageSize,
             ]));
@@ -107,7 +117,7 @@ class WeclappClient
      */
     public function find(string $endpoint, string|int $id): ?object
     {
-        $response = $this->client->get($this->path($endpoint).'/'.$id);
+        $response = $this->client()->get($this->path($endpoint).'/'.$id);
 
         if ($response->notFound()) {
             return null;
@@ -127,7 +137,7 @@ class WeclappClient
      */
     public function count(string $endpoint, array $params = []): int
     {
-        $response = $this->client->get($this->path($endpoint).'/count', $params);
+        $response = $this->client()->get($this->path($endpoint).'/count', $params);
 
         $response->throw();
 
@@ -152,7 +162,7 @@ class WeclappClient
             $path .= '?dryRun=true';
         }
 
-        $response = $this->client->post($path, $data);
+        $response = $this->client()->post($path, $data);
 
         $response->throw();
 
@@ -162,6 +172,21 @@ class WeclappClient
     public function parties(): Party
     {
         return app(Party::class);
+    }
+
+    public function customers(): Customer
+    {
+        return app(Customer::class);
+    }
+
+    public function suppliers(): Supplier
+    {
+        return app(Supplier::class);
+    }
+
+    public function projects(): Project
+    {
+        return app(Project::class);
     }
 
     public function articles(): Article

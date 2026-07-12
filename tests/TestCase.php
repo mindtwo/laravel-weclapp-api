@@ -27,6 +27,9 @@ class TestCase extends Orchestra
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');
+        config()->set('weclapp-api.base_url', 'https://tenant.weclapp.com/webapp/api/v2/');
+        config()->set('weclapp-api.token', 'test-token');
+        config()->set('weclapp-api.timezone', 'UTC');
 
         /*
          foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/../database/migrations') as $migration) {

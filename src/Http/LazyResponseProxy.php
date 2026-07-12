@@ -79,7 +79,7 @@ class LazyResponseProxy
             throw new RuntimeException('Cannot execute the API call after getJob() has been called.');
         }
 
-        $client = $this->api->client;
+        $client = $this->api->client();
 
         if (! empty($this->queryParams)) {
             $client = $client->withQueryParameters($this->queryParams);
