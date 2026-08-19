@@ -218,6 +218,52 @@ stored in the unified `weclapp_parties` table.
 composer test
 ```
 
+## Upgrading
+
+### Environment variables are now `MINDTWO_WECLAPP_*` prefixed
+
+Every setting is read from a `MINDTWO_WECLAPP_`-prefixed variable. Previously the
+config read unprefixed `WECLAPP_*` names while `.env.example` already documented
+the prefixed ones, so a token placed under the documented name resolved to an
+empty string and requests went out unauthenticated. Rename the following in your
+`.env`:
+
+| Old | New |
+| --- | --- |
+| `WECLAPP_URL` | `MINDTWO_WECLAPP_URL` |
+| `WECLAPP_TOKEN` | `MINDTWO_WECLAPP_API_KEY` |
+| `WECLAPP_PAGE_SIZE` | `MINDTWO_WECLAPP_PAGE_SIZE` |
+| `WECLAPP_TIMEZONE` | `MINDTWO_WECLAPP_TIMEZONE` |
+| `WECLAPP_WRITES_ENABLED` | `MINDTWO_WECLAPP_WRITES_ENABLED` |
+| `WECLAPP_HTTP_TIMEOUT` | `MINDTWO_WECLAPP_HTTP_TIMEOUT` |
+| `WECLAPP_HTTP_CONNECT_TIMEOUT` | `MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT` |
+| `WECLAPP_HTTP_RETRY_TIMES` | `MINDTWO_WECLAPP_HTTP_RETRY_TIMES` |
+| `WECLAPP_HTTP_RETRY_SLEEP` | `MINDTWO_WECLAPP_HTTP_RETRY_SLEEP` |
+| `WECLAPP_QUEUE_CONNECTION` | `MINDTWO_WECLAPP_QUEUE_CONNECTION` |
+| `WECLAPP_RATE_LIMIT_PER_MINUTE` | `MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE` |
+| `WECLAPP_LOG_EVENTS` | `MINDTWO_WECLAPP_LOG_EVENTS` |
+| `WECLAPP_LOG_LEVEL` | `MINDTWO_WECLAPP_LOG_LEVEL` |
+| `WECLAPP_LOG_CHANNEL` | `MINDTWO_WECLAPP_LOG_CHANNEL` |
+| `WECLAPP_LOG_INCLUDE_PAYLOAD` | `MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD` |
+
+Note that `WECLAPP_TOKEN` is not simply prefixed — it becomes
+`MINDTWO_WECLAPP_API_KEY`.
+
+**If you have published `config/weclapp-api.php`**, your copy takes precedence
+over the package's, so nothing breaks until you re-publish — but the two have
+silently diverged. Rename the `env()` keys in your published config as well,
+otherwise re-publishing swaps in the new names and leaves your old `.env`
+unread. `tests/Vendor/ConfigEnvNamesTest.php` pins the package config and
+`.env.example` to each other.
+
+### `Amount` and `Report` have been removed
+
+The `Amount` and `Report` models, their factories and their migrations are gone,
+along with `Quotation::report()`. Neither was a Weclapp resource — no endpoint,
+no entry in the OpenAPI v2 spec — and `SyncRegistry` never populated them, so
+`weclapp_amounts` and `weclapp_reports` could not receive a row. If you
+published the migrations, drop both tables.
+
 ## Changelog
 
 Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
