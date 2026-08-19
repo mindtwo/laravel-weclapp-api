@@ -6,7 +6,6 @@ namespace Mindtwo\LaravelWeclappApi\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Mindtwo\LaravelWeclappApi\Database\Factories\QuotationFactory;
 
 /**
@@ -47,14 +46,6 @@ class Quotation extends Model
     protected static function newFactory(): QuotationFactory
     {
         return QuotationFactory::new();
-    }
-
-    /**
-     * @return HasOne<Report, $this>
-     */
-    public function report(): HasOne
-    {
-        return $this->hasOne(Report::class, 'quotation_id', 'weclapp_id');
     }
 
     /**
