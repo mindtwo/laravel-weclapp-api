@@ -81,7 +81,7 @@ Help improve test coverage by:
 
 - PHP 8.5 or higher
 - Composer 2
-- Node.js 24 (`lts/krypton`, see `.nvmrc`; requires `>=24.18.0`) and pnpm 11 (pinned to `11.11.0` via the `packageManager` field, requires `>=11.11.0`) — used for commit tooling and releases
+- Node.js 24 (`lts/krypton`, see `.nvmrc`; requires `>=24.18.0`) and npm 12 (pinned to `12.0.2` via the `packageManager` field, requires `>=12.0.0`) — used for commit tooling and releases
 - Git
 
 ### Initial Setup
@@ -97,7 +97,7 @@ Help improve test coverage by:
 3. **Install dependencies**:
    ```bash
    composer install
-   pnpm install
+   npm install
    ```
 
 4. **Create a feature branch**:
