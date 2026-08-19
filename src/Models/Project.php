@@ -12,7 +12,6 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ProjectFactory;
  * @property int $id
  * @property int|null $customer_id
  * @property int|null $weclapp_id
- * @property string|null $customer_number
  * @property string|null $description
  * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $project_number
@@ -31,7 +30,6 @@ class Project extends Model
 
     protected $fillable = [
         'customer_id',
-        'customer_number',
         'description',
         'last_modified',
         'project_number',

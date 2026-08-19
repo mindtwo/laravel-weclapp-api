@@ -33,7 +33,7 @@ it('queries a collection endpoint against the entity path', function () {
 });
 
 it('finds a single record by id', function () {
-    Http::fake(['*/article/42' => Http::response(['id' => '42', 'name' => 'Widget'], 200)]);
+    Http::fake(['*/article/id/42' => Http::response(['id' => '42', 'name' => 'Widget'], 200)]);
 
     expect(WeclappClient::articles()->find(42)?->name)->toBe('Widget');
 });

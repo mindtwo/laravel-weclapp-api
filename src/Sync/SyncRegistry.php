@@ -17,11 +17,14 @@ use Mindtwo\LaravelWeclappApi\Models\User;
  * into a mirror table. Derived data (amounts, reports) and nested collections
  * (addresses, contacts, bank accounts) are intentionally left to the consumer.
  *
- * Field maps validated against the official Weclapp OpenAPI 3.1 spec
- * (https://www.weclapp.com/api/openapi_v2.yaml) and a live read against the
- * production API; the collection envelope is `{ "result": [...] }`. Note: the
- * `project` endpoint is absent from the public spec but is real and live
- * (production-confirmed).
+ * Field maps validated against docs/specifications/weclapp-openapi_v2.json and a
+ * live read of every endpoint below (500-record sample where available); the
+ * collection envelope is `{ "result": [...] }`. Every field mapped here was
+ * observed on at least one live record.
+ *
+ * Customers and suppliers are both filtered views of /party — /customer and
+ * /supplier return 404. The `project` endpoint is absent from the spec but is
+ * real and populated (live-confirmed), so it is mapped from live responses.
  */
 final class SyncRegistry
 {
@@ -32,7 +35,7 @@ final class SyncRegistry
     {
         return [
             'customers' => new SyncDefinition(
-                endpoint: 'customer',
+                endpoint: 'party',
                 model: Party::class,
                 map: [
                     'company'             => 'company',
@@ -47,9 +50,10 @@ final class SyncRegistry
                     'weclapp_id'          => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
+                filters: ['customer-eq' => 'true'],
             ),
             'suppliers' => new SyncDefinition(
-                endpoint: 'supplier',
+                endpoint: 'party',
                 model: Party::class,
                 map: [
                     'company'         => 'company',
@@ -64,6 +68,7 @@ final class SyncRegistry
                     'weclapp_id'      => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
+                filters: ['supplier-eq' => 'true'],
             ),
             'article-categories' => new SyncDefinition(
                 endpoint: 'articleCategory',
@@ -103,7 +108,6 @@ final class SyncRegistry
                 model: Quotation::class,
                 map: [
                     'customer_id'      => 'customerId',
-                    'customer_number'  => 'customerNumber',
                     'gross_amount'     => 'grossAmount',
                     'net_amount'       => 'netAmount',
                     'quotation_number' => 'quotationNumber',
@@ -118,12 +122,10 @@ final class SyncRegistry
                 model: SalesOrder::class,
                 map: [
                     'customer_id'         => 'customerId',
-                    'customer_number'     => 'customerNumber',
                     'gross_amount'        => 'grossAmount',
                     'net_amount'          => 'netAmount',
                     'order_number'        => 'orderNumber',
                     'quotation_id'        => 'quotationId',
-                    'quotation_number'    => 'quotationNumber',
                     'record_free_text'    => 'recordFreeText',
                     'responsible_user_id' => 'responsibleUserId',
                     'status'              => 'status',
@@ -142,13 +144,12 @@ final class SyncRegistry
                 endpoint: 'project',
                 model: Project::class,
                 map: [
-                    'customer_id'     => 'customerId',
-                    'customer_number' => 'customerNumber',
-                    'description'     => 'description',
-                    'project_number'  => 'projectNumber',
-                    'status'          => 'status',
-                    'title'           => 'name',
-                    'weclapp_id'      => 'id',
+                    'customer_id'    => 'customerId',
+                    'description'    => 'description',
+                    'project_number' => 'projectNumber',
+                    'status'         => 'status',
+                    'title'          => 'name',
+                    'weclapp_id'     => 'id',
                 ],
                 dates: [
                     'last_modified'      => 'lastModifiedDate',

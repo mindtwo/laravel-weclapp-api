@@ -15,7 +15,6 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\QuotationFactory;
  * @property int|null $report_id
  * @property int|null $status_id
  * @property int|null $weclapp_id
- * @property string|null $customer_number
  * @property string|null $gross_amount
  * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $net_amount
@@ -34,7 +33,6 @@ class Quotation extends Model
 
     protected $fillable = [
         'customer_id',
-        'customer_number',
         'gross_amount',
         'last_modified',
         'net_amount',

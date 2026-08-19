@@ -18,7 +18,6 @@ class QuotationFactory extends Factory
     {
         return [
             'customer_id'      => $this->faker->numberBetween(10000, 99999),
-            'customer_number'  => 'C'.$this->faker->numberBetween(10000, 99999),
             'gross_amount'     => $this->faker->randomFloat(2, 100, 100000),
             'last_modified'    => $this->faker->dateTime(),
             'net_amount'       => $this->faker->randomFloat(2, 100, 100000),

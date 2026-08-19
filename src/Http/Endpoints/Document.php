@@ -7,4 +7,6 @@ namespace Mindtwo\LaravelWeclappApi\Http\Endpoints;
 class Document extends Endpoint
 {
     protected string $path = 'document';
+
+    protected array $writes = ['update', 'delete'];
 }

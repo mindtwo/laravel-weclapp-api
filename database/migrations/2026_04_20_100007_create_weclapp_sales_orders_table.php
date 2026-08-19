@@ -16,14 +16,12 @@ return new class extends Migration
             $table->unsignedBigInteger('quotation_id')->nullable();
             $table->unsignedBigInteger('responsible_user_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
-            $table->string('customer_number')->nullable();
             $table->decimal('gross_amount', 12, 2)->nullable();
             $table->datetime('last_modified')->nullable();
             $table->decimal('net_amount', 12, 2)->nullable();
             $table->datetime('order_date')->nullable();
             $table->string('order_number')->nullable();
             $table->datetime('pricing_date')->nullable();
-            $table->string('quotation_number')->nullable();
             $table->text('record_free_text')->nullable();
             $table->datetime('service_period_from')->nullable();
             $table->datetime('service_period_to')->nullable();

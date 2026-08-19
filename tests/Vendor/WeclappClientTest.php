@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
@@ -56,3 +57,29 @@ it('returns null when finding a missing record', function () {
 
     expect(WeclappClient::find('party', 'nope'))->toBeNull();
 });
+
+it('puts to an arbitrary record without a typed endpoint class', function () {
+    Http::fake(['*' => Http::response(['id' => '7'], 200)]);
+
+    $result = WeclappClient::put('warehouseStock', 7, ['quantity' => 3]);
+
+    expect($result)->toBe(['id' => '7']);
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/warehouseStock/id/7')
+        && $request->method() === 'PUT'
+        && $request['quantity'] === 3);
+});
+
+it('deletes an arbitrary record without a typed endpoint class', function () {
+    Http::fake(['*' => Http::response('', 204)]);
+
+    expect(WeclappClient::delete('ticket', 9))->toBeTrue();
+
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/ticket/id/9')
+        && $request->method() === 'DELETE');
+});
+
+it('throws when a generic write fails', function () {
+    Http::fake(['*' => Http::response(['error' => 'nope'], 422)]);
+
+    WeclappClient::put('ticket', 1, []);
+})->throws(RequestException::class);

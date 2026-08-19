@@ -216,12 +216,60 @@ the base cannot express (e.g. a sub-resource action). Writes must keep returning
 a `LazyResponseProxy` (return `new LazyResponseProxy($this->api, $path, $method, body: $data)`)
 so callers keep the sync/queue/event behaviour.
 
+Resources that are not fully writable declare what the API offers, so an
+unsupported call fails in the guard instead of going out as a request Weclapp
+rejects:
+
+```php
+class SalesOpenItem extends Endpoint
+{
+    protected string $path = 'salesOpenItem';
+
+    protected array $writes = [];
+}
+```
+
 ### 2. Register it
 
 - Add the class to the `ENDPOINTS` list in `WeclappApiServiceProvider` so it is
   bound as a singleton.
 - Add an accessor to `WeclappClient` (e.g. `public function salesChannels(): SalesChannel { return app(SalesChannel::class); }`).
 - Add a matching `@method` line to the `WeclappClient` facade docblock.
+
+All three are enforced by `tests/Vendor/EndpointSpecConformanceTest.php`, which
+checks every class against the vendored spec rather than a hand-maintained list.
+Forget one and the suite tells you which.
+
+### How endpoint classes are validated
+
+`$path` and `$writes` are derived from `docs/specifications/weclapp-openapi_v2.json`,
+the vendored copy of the official spec, and the conformance test asserts they
+still match it. That is the whole contract of these classes — they hold no field
+mappings, so the spec is sufficient to keep them honest.
+
+Live validation is a separate, weaker guarantee, and it is limited by the API
+token available to us:
+
+- **83 of 153 resources are live-confirmed.** `GET /meta/resources` returns the
+  resources the calling token can see (82 of ours), each with its real operation
+  set; `project` was confirmed by a direct read.
+- **70 are spec-only.** Whole modules (ticketing, warehouse/storage, production,
+  variant articles, banking) answer `403` for our token because they are not
+  licensed or not granted, so they cannot be exercised at all. Note this includes
+  a few long-standing classes — `contract`, `purchaseInvoice`, `purchaseOrder`,
+  `shipment`, `warehouse` — not just recent additions.
+
+Do **not** narrow `$writes` to match `/meta/resources`. It disagrees with
+`GET /system/permissions` in both directions (for `article`, meta omits delete
+while permissions grant it and withhold create), so neither reflects the API
+contract — both describe one tenant's licensing and one user's rights. Encoding
+either would break the package for consumers with different rights.
+
+If you ever have a token with wider access, re-run the checks in
+`bin/verify-live-paths.sh` (read-only, `GET` requests only; it reads
+`MINDTWO_WECLAPP_URL` and `MINDTWO_WECLAPP_API_KEY` from `.env`) and compare
+`/meta/resources` against the class list; that is the only way to shrink the
+spec-only set.
 
 ### 3. Method contract
 

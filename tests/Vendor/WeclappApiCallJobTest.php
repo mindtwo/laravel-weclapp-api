@@ -22,14 +22,14 @@ it('can be queued from the proxy', function () {
     dispatch($job);
 
     Queue::assertPushed(WeclappApiCallJob::class, fn ($queued) => $queued->method === 'PUT'
-        && $queued->endpoint === 'article/9');
+        && $queued->endpoint === 'article/id/9');
 });
 
 it('performs the request and emits a completion event when handled', function () {
     Event::fake([WeclappApiCallCompleted::class]);
-    Http::fake(['*/article/9' => Http::response(['id' => '9'], 200)]);
+    Http::fake(['*/article/id/9' => Http::response(['id' => '9'], 200)]);
 
-    (new WeclappApiCallJob('article/9', 'PUT', ['name' => 'New']))->handle();
+    (new WeclappApiCallJob('article/id/9', 'PUT', ['name' => 'New']))->handle();
 
     Http::assertSent(fn ($request) => $request->method() === 'PUT');
     Event::assertDispatched(WeclappApiCallCompleted::class, fn ($event) => $event->successful === true);

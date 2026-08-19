@@ -20,7 +20,7 @@ final readonly class EntitySynchronizer
      */
     public function sync(SyncDefinition $definition, array $filters = []): int
     {
-        $records = $this->client->get($definition->endpoint, $filters);
+        $records = $this->client->get($definition->endpoint, [...$definition->filters, ...$filters]);
 
         foreach ($records as $record) {
             $attributes = $definition->attributes($record);

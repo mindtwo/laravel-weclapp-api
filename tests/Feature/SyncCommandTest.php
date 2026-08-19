@@ -14,7 +14,7 @@ beforeEach(function () {
 });
 
 it('syncs customers into the parties mirror table', function () {
-    Http::fake(['*customer*' => Http::response(['result' => [[
+    Http::fake(['*party*' => Http::response(['result' => [[
         'id'                => '12345',
         'customerNumber'    => 'C10001',
         'company'           => 'Test GmbH',
@@ -35,10 +35,13 @@ it('syncs customers into the parties mirror table', function () {
         ->and($party->company_2)->toBe('Test Title')
         ->and($party->responsible_user_id)->toBe(8001)
         ->and($party->last_modified)->not->toBeNull();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/v2/party?')
+        && str_contains($request->url(), 'customer-eq=true'));
 });
 
 it('syncs suppliers into the parties mirror table', function () {
-    Http::fake(['*supplier*' => Http::response(['result' => [[
+    Http::fake(['*party*' => Http::response(['result' => [[
         'id'             => 70001,
         'supplierNumber' => 'SU-10001',
         'company'        => 'Supplier GmbH',
@@ -57,6 +60,18 @@ it('syncs suppliers into the parties mirror table', function () {
         ->and($party->customer_number)->toBeNull()
         ->and($party->last_name)->toBe('Schmidt')
         ->and($party->party_type)->toBe('ORGANIZATION');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/v2/party?')
+        && str_contains($request->url(), 'supplier-eq=true'));
+});
+
+it('combines the entity filter with a delta filter when updating', function () {
+    Http::fake(['*party*' => Http::response(['result' => []], 200)]);
+
+    $this->artisan('weclapp:update customers --since=2026-01-01')->assertSuccessful();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'customer-eq=true')
+        && str_contains($request->url(), 'lastModifiedDate-gt='));
 });
 
 it('is idempotent, upserting on weclapp_id', function () {
