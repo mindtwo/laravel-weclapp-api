@@ -6,7 +6,6 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
 pest-coverage-output.xml*
 
@@ -59,7 +58,6 @@ bower_components
 build/Release
 
 # Dependency directories
-.pnpm-store
 jspm_packages
 node_modules
 /vendor
