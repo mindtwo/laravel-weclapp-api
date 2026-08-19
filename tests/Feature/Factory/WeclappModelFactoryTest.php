@@ -3,13 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Carbon;
-use Mindtwo\LaravelWeclappApi\Models\Amount;
 use Mindtwo\LaravelWeclappApi\Models\Article;
 use Mindtwo\LaravelWeclappApi\Models\ArticleCategory;
 use Mindtwo\LaravelWeclappApi\Models\Party;
 use Mindtwo\LaravelWeclappApi\Models\Project;
 use Mindtwo\LaravelWeclappApi\Models\Quotation;
-use Mindtwo\LaravelWeclappApi\Models\Report;
 use Mindtwo\LaravelWeclappApi\Models\SalesOrder;
 use Mindtwo\LaravelWeclappApi\Models\User;
 
@@ -20,13 +18,11 @@ it('creates a persisted record via its factory', function (string $model) {
         ->and($record->getKey())->not->toBeNull()
         ->and($model::query()->count())->toBe(1);
 })->with([
-    Amount::class,
     Article::class,
     ArticleCategory::class,
     Party::class,
     Project::class,
     Quotation::class,
-    Report::class,
     SalesOrder::class,
     User::class,
 ]);
@@ -53,12 +49,9 @@ it('resolves the article to category relationship by weclapp id', function () {
     expect($article->category->is($category))->toBeTrue();
 });
 
-it('resolves quotation, report and sales order relationships by weclapp id', function () {
+it('resolves the sales order to quotation relationship by weclapp id', function () {
     $quotation = Quotation::factory()->create(['weclapp_id' => 777]);
-    $report = Report::factory()->create(['quotation_id' => 777]);
     $order = SalesOrder::factory()->create(['quotation_id' => 777]);
 
-    expect($report->quotation->is($quotation))->toBeTrue()
-        ->and($order->quotation->is($quotation))->toBeTrue()
-        ->and($quotation->report->is($report))->toBeTrue();
+    expect($order->quotation->is($quotation))->toBeTrue();
 });
