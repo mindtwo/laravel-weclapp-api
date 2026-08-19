@@ -26,6 +26,28 @@ it('suppresses a low-level post when writes are disabled', function () {
         && $e->suppressed === true);
 });
 
+it('suppresses a low-level put when writes are disabled', function () {
+    Http::fake();
+    Event::fake([WeclappApiCallCompleted::class]);
+
+    expect(WeclappClient::put('quotation', 5, ['foo' => 'bar']))->toBe([]);
+
+    Http::assertNothingSent();
+    Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'PUT'
+        && $e->suppressed === true);
+});
+
+it('suppresses a low-level delete when writes are disabled', function () {
+    Http::fake();
+    Event::fake([WeclappApiCallCompleted::class]);
+
+    expect(WeclappClient::delete('quotation', 5))->toBeTrue();
+
+    Http::assertNothingSent();
+    Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'DELETE'
+        && $e->suppressed === true);
+});
+
 it('suppresses an endpoint write via the proxy and returns a neutral response', function () {
     Http::fake();
     Event::fake([WeclappApiCallCompleted::class]);

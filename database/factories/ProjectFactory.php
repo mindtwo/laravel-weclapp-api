@@ -18,7 +18,6 @@ class ProjectFactory extends Factory
     {
         return [
             'customer_id'        => $this->faker->numberBetween(10000, 99999),
-            'customer_number'    => 'C'.$this->faker->numberBetween(10000, 99999),
             'description'        => $this->faker->sentence(),
             'last_modified'      => $this->faker->dateTime(),
             'project_number'     => 'PJ'.$this->faker->unique()->numberBetween(1000, 9999),

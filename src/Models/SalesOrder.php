@@ -15,14 +15,12 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\SalesOrderFactory;
  * @property int|null $quotation_id
  * @property int|null $responsible_user_id
  * @property int|null $weclapp_id
- * @property string|null $customer_number
  * @property string|null $gross_amount
  * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $net_amount
  * @property \Illuminate\Support\Carbon|null $order_date
  * @property string|null $order_number
  * @property \Illuminate\Support\Carbon|null $pricing_date
- * @property string|null $quotation_number
  * @property string|null $record_free_text
  * @property \Illuminate\Support\Carbon|null $service_period_from
  * @property \Illuminate\Support\Carbon|null $service_period_to
@@ -40,7 +38,6 @@ class SalesOrder extends Model
 
     protected $fillable = [
         'customer_id',
-        'customer_number',
         'gross_amount',
         'last_modified',
         'net_amount',
@@ -48,7 +45,6 @@ class SalesOrder extends Model
         'order_number',
         'pricing_date',
         'quotation_id',
-        'quotation_number',
         'record_free_text',
         'responsible_user_id',
         'service_period_from',

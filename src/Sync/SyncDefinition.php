@@ -17,6 +17,7 @@ final readonly class SyncDefinition
      * @param array<string, string> $map column => API field (scalar copy)
      * @param array<string, string> $dates column => API field (epoch-ms datetime)
      * @param array<string, mixed> $defaults column => static value applied to every record
+     * @param array<string, mixed> $filters query filters narrowing a shared resource to this entity
      * @param string $key The mirror column used to match existing rows (its API field must be in $map)
      */
     public function __construct(
@@ -25,6 +26,7 @@ final readonly class SyncDefinition
         public array $map,
         public array $dates = [],
         public array $defaults = [],
+        public array $filters = [],
         public string $key = 'weclapp_id',
     ) {}
 

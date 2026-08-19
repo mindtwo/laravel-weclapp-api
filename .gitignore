@@ -153,6 +153,7 @@ Thumbs.db
 
 # custom project files and directories
 .env
+.context
 /package.xml
 build/phpstan
 report.junit.xml

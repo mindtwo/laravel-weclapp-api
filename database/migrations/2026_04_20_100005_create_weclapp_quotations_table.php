@@ -16,7 +16,6 @@ return new class extends Migration
             $table->unsignedBigInteger('report_id')->nullable();
             $table->unsignedBigInteger('status_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
-            $table->string('customer_number')->nullable();
             $table->decimal('gross_amount', 12, 2)->nullable();
             $table->datetime('last_modified')->nullable();
             $table->decimal('net_amount', 12, 2)->nullable();

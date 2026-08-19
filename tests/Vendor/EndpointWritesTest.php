@@ -7,27 +7,27 @@ use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 use Mindtwo\LaravelWeclappApi\Http\LazyResponseProxy;
 
 it('updates a record with a PUT to the entity path and id', function () {
-    Http::fake(['*/article/42' => Http::response(['id' => '42'], 200)]);
+    Http::fake(['*/article/id/42' => Http::response(['id' => '42'], 200)]);
 
     $proxy = WeclappClient::articles()->update(42, ['name' => 'Renamed']);
 
     expect($proxy)->toBeInstanceOf(LazyResponseProxy::class)
         ->and($proxy->status())->toBe(200);
 
-    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/article/42')
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/article/id/42')
         && $request->method() === 'PUT'
         && $request['name'] === 'Renamed');
 });
 
 it('deletes a record with a DELETE to the entity path and id', function () {
-    Http::fake(['*/article/42' => Http::response('', 204)]);
+    Http::fake(['*/article/id/42' => Http::response('', 204)]);
 
     $proxy = WeclappClient::articles()->delete(42);
 
     expect($proxy)->toBeInstanceOf(LazyResponseProxy::class)
         ->and($proxy->status())->toBe(204);
 
-    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/article/42')
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/article/id/42')
         && $request->method() === 'DELETE');
 });
 

@@ -13,9 +13,10 @@ Highlights:
 
 - A single configured HTTP client (`WeclappClient`) with the `AuthenticationToken`
   header, automatic page-merging, timeouts and retry.
-- Typed endpoint classes for the common sales/CRM entities, each with
-  `query()` / `find()` / `count()` (reads) and `create()` / `update()` / `delete()`
-  (writes). The generic client still reaches every one of Weclapp's ~150 endpoints.
+- A typed endpoint class for **every** resource the Weclapp v2 API documents (152
+  of them), each with `query()` / `find()` / `count()` (reads) and
+  `create()` / `update()` / `delete()` (writes, where the API offers them).
+  The generic client still reaches anything else, including nested actions.
 - Writes return a lazy response proxy that runs synchronously **or** hands back an
   undispatched, rate-limited queue job; every call emits a `WeclappApiCallCompleted`
   event.
@@ -51,23 +52,23 @@ Set your Weclapp instance URL and personal API token in `.env`. Create a token
 under *My settings → API* in Weclapp.
 
 ```
-WECLAPP_URL="https://your-tenant.weclapp.com/webapp/api/v2/"
-WECLAPP_TOKEN="your_weclapp_api_token"
+MINDTWO_WECLAPP_URL="https://your-tenant.weclapp.com/webapp/api/v2/"
+MINDTWO_WECLAPP_API_KEY="your_weclapp_api_token"
 ```
 
 Other supported variables (see [`config/weclapp-api.php`](config/weclapp-api.php)):
 
 ```
-WECLAPP_PAGE_SIZE=1000            # records per page (Weclapp caps at 1000)
-WECLAPP_TIMEZONE=UTC              # timezone for epoch-ms date conversion
-WECLAPP_HTTP_TIMEOUT=60
-WECLAPP_HTTP_CONNECT_TIMEOUT=10
-WECLAPP_HTTP_RETRY_TIMES=3
-WECLAPP_HTTP_RETRY_SLEEP=500
-WECLAPP_QUEUE_CONNECTION=         # connection for queued API-call jobs
-WECLAPP_RATE_LIMIT_PER_MINUTE=100 # limit applied to queued API-call jobs
-WECLAPP_WRITES_ENABLED=           # see "Write suppression" below
-WECLAPP_LOG_EVENTS=false          # log every WeclappApiCallCompleted event
+MINDTWO_WECLAPP_PAGE_SIZE=1000            # records per page (Weclapp caps at 1000)
+MINDTWO_WECLAPP_TIMEZONE=UTC              # timezone for epoch-ms date conversion
+MINDTWO_WECLAPP_HTTP_TIMEOUT=60
+MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT=10
+MINDTWO_WECLAPP_HTTP_RETRY_TIMES=3
+MINDTWO_WECLAPP_HTTP_RETRY_SLEEP=500
+MINDTWO_WECLAPP_QUEUE_CONNECTION=         # connection for queued API-call jobs
+MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE=100 # limit applied to queued API-call jobs
+MINDTWO_WECLAPP_WRITES_ENABLED=           # see "Write suppression" below
+MINDTWO_WECLAPP_LOG_EVENTS=false          # log every WeclappApiCallCompleted event
 ```
 
 ## Usage
@@ -91,12 +92,41 @@ $article = WeclappClient::articles()->find(20001);
 $open = WeclappClient::quotations()->count(['status-eq' => 'OPEN']);
 ```
 
-Available typed accessors include `parties()`, `customers()`, `suppliers()`,
-`projects()`, `articles()`, `articleCategories()`, `quotations()`,
-`salesOrders()`, `users()`, plus common neighbours (`salesInvoices()`,
-`purchaseOrders()`, `contracts()`, `opportunities()`, `units()`, `taxes()`,
-`paymentMethods()`, `currencies()`, and more). See the `WeclappClient` facade
-docblock for the full list.
+There is an accessor for every documented resource — from the everyday
+`parties()`, `articles()`, `quotations()`, `salesOrders()`, `users()` through to
+`tickets()`, `warehouseStocks()`, `productionOrders()`, `timeRecords()` and
+`customAttributeDefinitions()`. See the `WeclappClient` facade docblock for the
+full list.
+
+Whether your Weclapp plan and API user can actually reach a given resource is a
+separate question: an unlicensed module or a restricted token answers `403`. The
+class existing does not imply access.
+
+### Read-only and partially writable resources
+
+Reads work on every resource, but writes do not. Roughly a fifth of the API is
+read-only (reports and system-maintained lists such as `salesOpenItems()` or
+`warehouseStocks()`), and a handful support only some verbs — `users()` has no
+delete, `documents()` has no create. Each class declares what the spec
+documents, and an unsupported call fails immediately rather than going out as a
+request Weclapp would reject:
+
+```php
+WeclappClient::salesOpenItems()->query();    // fine
+WeclappClient::salesOpenItems()->create([]); // BadMethodCallException
+
+WeclappClient::tickets()->writes();          // ['create', 'update', 'delete']
+WeclappClient::salesOpenItems()->writes();   // []
+```
+
+Weclapp has no separate customer or supplier resource — both are parties
+carrying a boolean flag. `customers()` and `suppliers()` are therefore filtered
+views of `/party`, and any filter you pass is merged on top:
+
+```php
+WeclappClient::customers()->query(['company-eq' => 'ACME GmbH']);
+// GET /party?customer-eq=true&company-eq=ACME+GmbH
+```
 
 ### Writes and the lazy response proxy
 
@@ -124,14 +154,26 @@ values through the call stack.
 
 ### Low-level client
 
-For endpoints without a typed class, use the generic methods (they hit any
-Weclapp resource):
+Every documented resource has a typed class, so the generic methods are for what
+falls outside that: the undocumented corners of the API, and the ~190 nested
+action paths. They hit any resource:
 
 ```php
-WeclappClient::get('salesChannel');                 // paginated Collection
-WeclappClient::find('unit', 5);                      // ?object
-WeclappClient::count('article');                     // int
+WeclappClient::get('salesChannel');                       // paginated Collection
+WeclappClient::find('unit', 5);                           // ?object
+WeclappClient::count('article');                          // int
 WeclappClient::post('quotation', $payload, dryRun: true); // array
+WeclappClient::put('warehouseStock', 7, $payload);        // array
+WeclappClient::delete('ticket', 9);                       // bool
+```
+
+`find()`, `put()` and `delete()` take the id separately because Weclapp
+addresses a single record as `/{resource}/id/{id}` — a bare `/{resource}/{id}`
+exists for no resource in the v2 API. Use `recordPath()` if you need to build
+that path yourself, e.g. for a nested action:
+
+```php
+WeclappClient::post(WeclappClient::recordPath('salesOrder', 42).'/createCustomerReturn', []);
 ```
 
 ### Write suppression
@@ -143,7 +185,7 @@ normally. The default is live everywhere except the `local` and `testing`
 environments; a missing flag never blocks production. Override with:
 
 ```
-WECLAPP_WRITES_ENABLED=true
+MINDTWO_WECLAPP_WRITES_ENABLED=true
 ```
 
 ## Mirroring entities
@@ -162,7 +204,13 @@ php artisan weclapp:update articles --since="2026-01-01 00:00:00"
 
 Supported sync entities: `customers`, `suppliers`, `article-categories`,
 `articles`, `users`, `quotations`, `sales-orders`, `projects`. Customers and
-suppliers are both stored in the unified `weclapp_parties` table.
+suppliers are both read from `/party` (filtered on the respective flag) and
+stored in the unified `weclapp_parties` table.
+
+> **`projects` is undocumented but real.** The `project` resource appears nowhere
+> in the official OpenAPI v2 spec, yet it responds and is populated
+> (live-confirmed). Because it is undocumented, Weclapp gives no compatibility
+> guarantee for it.
 
 ## Testing
 

@@ -14,7 +14,6 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('customer_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
-            $table->string('customer_number')->nullable();
             $table->text('description')->nullable();
             $table->datetime('last_modified')->nullable();
             $table->string('project_number')->nullable();
