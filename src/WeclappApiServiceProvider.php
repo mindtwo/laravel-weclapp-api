@@ -173,6 +173,28 @@ use Spatie\LaravelPackageTools\PackageServiceProvider;
 class WeclappApiServiceProvider extends PackageServiceProvider
 {
     /**
+     * Mirror-table migrations, keyed by the publish tag suffix. Each entry gets
+     * its own `weclapp-api-migrations-{key}` tag so a consumer can take only the
+     * tables it reads instead of all of them.
+     *
+     * Keys match the Sync\SyncRegistry entity names, except `parties`, which
+     * backs both the `customers` and `suppliers` entities.
+     *
+     * @var array<string, string>
+     */
+    private const array MIGRATIONS = [
+        'parties'            => '2026_04_20_100001_create_weclapp_parties_table.php',
+        'article-categories' => '2026_04_20_100002_create_weclapp_article_categories_table.php',
+        'articles'           => '2026_04_20_100003_create_weclapp_articles_table.php',
+        'users'              => '2026_04_20_100004_create_weclapp_users_table.php',
+        'quotations'         => '2026_04_20_100005_create_weclapp_quotations_table.php',
+        'sales-orders'       => '2026_04_20_100007_create_weclapp_sales_orders_table.php',
+        'projects'           => '2026_04_20_100009_create_weclapp_projects_table.php',
+        'article-prices'     => '2026_04_20_100010_create_weclapp_article_prices_table.php',
+        'sales-invoices'     => '2026_04_20_100011_create_weclapp_sales_invoices_table.php',
+    ];
+
+    /**
      * Every typed endpoint class, registered as a singleton and reachable via
      * the matching WeclappClient accessor.
      *
@@ -361,12 +383,21 @@ class WeclappApiServiceProvider extends PackageServiceProvider
 
     public function packageBooted(): void
     {
-        // Publish (rather than auto-run) so a consuming app opts in when ready.
-        // Weclapp mirror data is company-wide, so these belong on the central
-        // connection and must not collide with an app's own weclapp tables.
+        // Publish (rather than auto-run) so a consuming app opts in when ready,
+        // and must not collide with an app's own weclapp tables.
+        //
+        // Two granularities: `weclapp-api-migrations` publishes every mirror
+        // table, and one tag per entity publishes just that table. Consumers
+        // rarely want all of them -- take only the entities you actually read.
         $this->publishesMigrations([
             __DIR__.'/../database/migrations' => database_path('migrations'),
         ], 'weclapp-api-migrations');
+
+        foreach (self::MIGRATIONS as $entity => $migration) {
+            $this->publishesMigrations([
+                __DIR__.'/../database/migrations/'.$migration => database_path('migrations/'.$migration),
+            ], 'weclapp-api-migrations-'.$entity);
+        }
 
         RateLimiter::for('weclapp-api-jobs', function (): Limit {
             return Limit::perMinute((int) config('weclapp-api.rate_limit_per_minute', 100))->by('weclapp-api-jobs');
