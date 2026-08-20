@@ -128,7 +128,14 @@ sw.*
 *.swp
 
 # "AI"
+/.ai/plans
+!/.ai/plans/.gitkeep
+/.claude/*.lock
 /.claude/settings.local.json
+# Agent scratch space: run logs, DB snapshots and hand-off notes. Never committed —
+# GrumPHP intent-adds untracked files when it stashes, so without this entry these
+# artefacts get swept into unrelated commits.
+/.context
 /.junie/mcp/mcp.json
 
 # ----
