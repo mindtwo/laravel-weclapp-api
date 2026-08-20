@@ -6,9 +6,11 @@ namespace Mindtwo\LaravelWeclappApi\Sync;
 
 use Mindtwo\LaravelWeclappApi\Models\Article;
 use Mindtwo\LaravelWeclappApi\Models\ArticleCategory;
+use Mindtwo\LaravelWeclappApi\Models\ArticlePrice;
 use Mindtwo\LaravelWeclappApi\Models\Party;
 use Mindtwo\LaravelWeclappApi\Models\Project;
 use Mindtwo\LaravelWeclappApi\Models\Quotation;
+use Mindtwo\LaravelWeclappApi\Models\SalesInvoice;
 use Mindtwo\LaravelWeclappApi\Models\SalesOrder;
 use Mindtwo\LaravelWeclappApi\Models\User;
 
@@ -154,6 +156,64 @@ final class SyncRegistry
                 dates: [
                     'last_modified'      => 'lastModifiedDate',
                     'project_start_date' => 'projectStartDate',
+                ],
+            ),
+            // customerId is present only on customer-specific prices; Weclapp omits
+            // null fields entirely, so the synchronizer leaves the column null for
+            // list prices. reductionAdditions is a nested collection and is skipped.
+            'article-prices' => new SyncDefinition(
+                endpoint: 'articlePrice',
+                model: ArticlePrice::class,
+                map: [
+                    'article_id'               => 'articleId',
+                    'currency_id'              => 'currencyId',
+                    'customer_id'              => 'customerId',
+                    'description'              => 'description',
+                    'last_modified_by_user_id' => 'lastModifiedByUserId',
+                    'price'                    => 'price',
+                    'price_scale_type'         => 'priceScaleType',
+                    'price_scale_value'        => 'priceScaleValue',
+                    'sales_channel'            => 'salesChannel',
+                    'version'                  => 'version',
+                    'weclapp_id'               => 'id',
+                ],
+                dates: [
+                    'end_date'      => 'endDate',
+                    'last_modified' => 'lastModifiedDate',
+                    'start_date'    => 'startDate',
+                ],
+            ),
+            'sales-invoices' => new SyncDefinition(
+                endpoint: 'salesInvoice',
+                model: SalesInvoice::class,
+                map: [
+                    'creator_id'          => 'creatorId',
+                    'currency_id'         => 'recordCurrencyId',
+                    'customer_id'         => 'customerId',
+                    'description'         => 'description',
+                    'gross_amount'        => 'grossAmount',
+                    'invoice_number'      => 'invoiceNumber',
+                    'net_amount'          => 'netAmount',
+                    'paid'                => 'paid',
+                    'payment_method_id'   => 'paymentMethodId',
+                    'payment_status'      => 'paymentStatus',
+                    'record_free_text'    => 'recordFreeText',
+                    'responsible_user_id' => 'responsibleUserId',
+                    'sales_channel'       => 'salesChannel',
+                    'sales_invoice_type'  => 'salesInvoiceType',
+                    'sales_order_id'      => 'salesOrderId',
+                    'status'              => 'status',
+                    'term_of_payment_id'  => 'termOfPaymentId',
+                    'version'             => 'version',
+                    'weclapp_id'          => 'id',
+                ],
+                dates: [
+                    'invoice_date'        => 'invoiceDate',
+                    'last_modified'       => 'lastModifiedDate',
+                    'pricing_date'        => 'pricingDate',
+                    'service_period_from' => 'servicePeriodFrom',
+                    'service_period_to'   => 'servicePeriodTo',
+                    'shipping_date'       => 'shippingDate',
                 ],
             ),
         ];

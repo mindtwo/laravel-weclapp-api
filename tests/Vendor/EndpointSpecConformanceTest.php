@@ -207,3 +207,22 @@ it('queries the resource path each endpoint declares', function () {
 
     expect($wrong)->toBe([]);
 });
+
+// Mirror factories seed enum-backed columns with literal strings. Those were
+// guessed from live records once and two of them were wrong (STANDARD instead of
+// STANDARD_INVOICE, OPEN instead of a real salesInvoice status). The spec lists
+// the valid values, so pin them rather than trusting a sample.
+it('seeds mirror factories with values the spec allows', function (string $factory, string $column, string $schema) {
+    $value = (new $factory)->definition()[$column];
+    $enum = spec()['components']['schemas'][$schema]['enum'] ?? null;
+
+    expect($enum)->toBeArray("spec schema {$schema} has no enum")
+        ->and($enum)->toContain($value);
+})->with([
+    [Mindtwo\LaravelWeclappApi\Database\Factories\ArticlePriceFactory::class, 'price_scale_type', 'priceScaleType'],
+    [Mindtwo\LaravelWeclappApi\Database\Factories\ArticlePriceFactory::class, 'sales_channel', 'distributionChannel'],
+    [Mindtwo\LaravelWeclappApi\Database\Factories\SalesInvoiceFactory::class, 'sales_channel', 'distributionChannel'],
+    [Mindtwo\LaravelWeclappApi\Database\Factories\SalesInvoiceFactory::class, 'sales_invoice_type', 'salesInvoiceType'],
+    [Mindtwo\LaravelWeclappApi\Database\Factories\SalesInvoiceFactory::class, 'status', 'salesInvoiceStatusType'],
+    [Mindtwo\LaravelWeclappApi\Database\Factories\SalesInvoiceFactory::class, 'payment_status', 'paymentStatus'],
+]);
