@@ -240,6 +240,63 @@ All three are enforced by `tests/Vendor/EndpointSpecConformanceTest.php`, which
 checks every class against the vendored spec rather than a hand-maintained list.
 Forget one and the suite tells you which.
 
+### Reading the vendored spec
+
+Everything below — endpoint paths, write verbs, mirror columns, factory values —
+comes out of the spec. Read it correctly or it will quietly tell you the wrong
+thing.
+
+**Two files, and they are not equivalent.** `docs/specifications/` holds both
+`weclapp-openapi_v2.yaml` and `weclapp-openapi_v2.json`. They agree exactly on
+`paths` (698), `components.schemas` (442) and `components.responses` (154). The
+JSON is a lossy conversion that drops `info.description` — **77k characters**
+documenting filter operators (`-eq`, `-in`, dot-notation predicates), the
+`properties=` partial-response parameter and PATCH semantics — plus all 207
+`tags` and 42 path descriptions. **Read the YAML for behaviour, the JSON for
+structure.** `SpecFilesAgreeTest` pins the parts that must stay in sync.
+
+**Schemas use `allOf` composition.** Reading `components.schemas.<x>.properties`
+directly returns an empty array for most resources; the fields live behind
+`$ref`s that must be resolved recursively:
+
+```php
+$resolve = function (string $name, array $seen = []) use (&$resolve, $schemas): array {
+    if (isset($seen[$name])) {
+        return [];
+    }
+
+    $seen[$name] = true;
+    $out = [];
+
+    foreach ($schemas[$name]['allOf'] ?? [] as $sub) {
+        $out += isset($sub['$ref'])
+            ? $resolve(basename($sub['$ref']), $seen)
+            : ($sub['properties'] ?? []);
+    }
+
+    return $out + ($schemas[$name]['properties'] ?? []);
+};
+```
+
+`articlePrice` reports 0 properties unresolved and 16 resolved. Concluding "the
+spec has no schemas" from the unresolved read is a mistake that has already been
+made once.
+
+**Enums are `$ref`s to standalone schemas**, not inline lists. `salesInvoice.status`
+points at `salesInvoiceStatusType` (`CANCELLED`, `DOCUMENT_CREATED`,
+`ENTRY_COMPLETED`, `NEW`, `OPEN_ITEM_CREATED`); `salesChannel` points at
+`distributionChannel`, which has **600** values. Resolve them before writing any
+literal — `FactorySpecEnumTest` asserts the mirror factories only seed values the
+spec allows.
+
+**`maxLength` is documented** — size string columns from it rather than defaulting
+to `string()`.
+
+**There are no example responses.** Neither file contains a single `example` or
+`examples` key. The spec gives you shape, never values, so it cannot tell you
+which fields this tenant actually populates. That still needs a live read — see
+`bin/verify-live-paths.sh`.
+
 ### How endpoint classes are validated
 
 `$path` and `$writes` are derived from `docs/specifications/weclapp-openapi_v2.json`,
@@ -286,16 +343,56 @@ any Weclapp resource, so a typed class is only about ergonomics and discoverabil
 
 ## Adding a mirror entity or sync command
 
-To have `weclapp:sync` populate a new local table:
+**Start with the generator.** It derives the whole scaffold from the spec, which
+is both faster and more accurate than hand-writing it:
+
+```bash
+php artisan weclapp:make-mirror articlePrice          # migration + model + factory
+php artisan weclapp:make-mirror salesInvoice --dry    # preview only
+php artisan weclapp:make-mirror ticket --only=id,subject,ticketNumber
+```
+
+It resolves the `allOf` chain, maps types (`format: timestamp` → `datetime` and
+into `dates`; `format: decimal` → `decimal`; `*Id` and `version` → integer
+columns despite being serialised as strings), sizes strings from `maxLength`,
+seeds factory values from the property's enum, and drops nested collections and
+entity references with a printed reason. It then prints the `SyncRegistry` entry
+and `MIGRATIONS` line to paste, since editing those files automatically is more
+trouble than it is worth.
+
+Generated output is a **starting point, not a finished mirror** — `salesInvoice`
+resolves to 73 scalar columns and you almost certainly want a fraction of them.
+Trim before publishing, and add relations by hand.
+
+Doing it manually instead:
 
 1. Add a `weclapp_*` migration + Eloquent model + factory (mirror the existing
    ones under `database/migrations`, `src/Models`, `database/factories`).
 2. Add a `SyncDefinition` entry to `Sync\SyncRegistry` mapping the endpoint,
    model, the column → API-field `map`, epoch-ms `dates`, the match `key`, and
    any static `defaults`.
+3. Register the migration in `WeclappApiServiceProvider::MIGRATIONS` so it gets a
+   `weclapp-api-migrations-{entity}` publish tag. `MigrationPublishTagTest` fails
+   if you forget.
 
 No command code changes are needed — the registry drives `weclapp:sync` and
 `weclapp:update`.
+
+**Derive the columns from the spec, not from a sampled response.** Resolve the
+resource's schema (see *Reading the vendored spec*) and take field names, types,
+`maxLength` and enum values from there.
+
+Sampling live responses to discover the shape does not work, because **Weclapp
+omits null fields from JSON entirely** — an absent key is indistinguishable from a
+field that does not exist. On `articlePrice`, a three-record sample shows 12
+fields; all 967 records show 16. The four that only appear sometimes include
+`customerId`, which is the entire basis of customer-specific pricing. A live read
+is still worth doing, but for a different question: which fields this tenant
+actually populates, and how densely.
+
+Nested collections (a party's addresses, an invoice's items, `reductionAdditions`)
+are deliberately out of scope for `SyncDefinition`, which maps flat scalars of one
+record into one row. Skip them and leave them to the consumer.
 
 ## Testing
 
