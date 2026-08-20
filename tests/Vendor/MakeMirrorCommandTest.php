@@ -137,7 +137,8 @@ it('derives a usable blueprint for every resource in the spec', function () {
         $blueprint = MirrorBlueprint::for($resource);
 
         if ($blueprint->columns === []) {
-            continue; // lookup lists whose response refs the shared customValue schema
+            // lookup lists whose response refs the shared customValue schema
+            continue;
         }
 
         $names = array_column($blueprint->columns, 'name');
@@ -219,7 +220,8 @@ it('generates syntactically valid php for every mirrored resource', function (st
 
         expect($status)->toBe(0, "{$resource} {$kind}: ".trim($output));
     }
-})->with(['articlePrice', 'party']); // php -l cross-check, in case php-parser is absent
+    // A php -l cross-check, kept in case php-parser is absent.
+})->with(['articlePrice', 'party']);
 
 it('registers the generator only when the vendored spec is present', function () {
     // docs/ is export-ignored, so a composer install has no spec and the command
