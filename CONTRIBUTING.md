@@ -473,23 +473,32 @@ Run tests matching a pattern:
 
 ### Commit Message Guidelines
 
-Write clear, descriptive commit messages:
+Releases are cut by semantic-release, which reads the **Conventional Commits**
+subject to choose the version bump and copies that line into `CHANGELOG.md`. The
+subject is therefore public API: keep it descriptive and free of internal
+shorthand.
 
 ```
-Add support for Weclapp Goals endpoint
+feat(weclapp-api): add an endpoint for the goal resource
 
-- Implement Goals CRUD operations
-- Add validation for goal creation
-- Include PHPDoc documentation
-- Add usage examples to README
+Explain why the change is needed and what it affects. Bullet points are fine.
+
+ticket(s):
+    - [sd-1234](https://app.clickup.com/t/30379192/SD-1234)
 ```
 
 **Format:**
 
-- First line: Brief summary (50 chars or less)
-- Blank line
-- Detailed description using bullet points
-- Reference issue numbers if applicable (`Fixes #123`)
+- Subject: `type(scope): summary` — `feat`, `fix`, `docs`, `test`, `chore`,
+  `refactor`, `build`, `ci`. Append `!` and add a `BREAKING-CHANGE:` trailer for
+  anything that breaks consumers.
+- Blank line, then a body explaining *why*, not restating the diff.
+- Internal work carries a `ticket(s):` trailer derived from the branch name. It
+  belongs in the **body only** — never the subject, which would publish ClickUp
+  ids to Packagist. External contributors should reference GitHub issues instead
+  (`Fixes #123`).
+
+GrumPHP validates the subject on commit.
 
 ### Pull Request Process
 
