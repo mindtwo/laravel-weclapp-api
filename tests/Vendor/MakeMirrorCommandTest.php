@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Artisan;
 use Mindtwo\LaravelWeclappApi\Spec\MirrorBlueprint;
 use Mindtwo\LaravelWeclappApi\Spec\SpecReader;
 
@@ -207,3 +208,15 @@ it('generates syntactically valid php for every mirrored resource', function (st
         expect($status)->toBe(0, "{$resource} {$kind}: ".implode(' ', $output));
     }
 })->with(['articlePrice', 'party']); // php -l cross-check, in case php-parser is absent
+
+it('registers the generator only when the vendored spec is present', function () {
+    // docs/ is export-ignored, so a composer install has no spec and the command
+    // would fail on read -- and would write into vendor/ if it did not. It is
+    // development tooling; a git checkout has the spec, a consumer install does not.
+    expect(SpecReader::available())->toBeTrue('spec missing from this checkout')
+        ->and(array_keys(Artisan::all()))->toContain('weclapp:make-mirror');
+});
+
+it('explains where the spec should be when it is missing', function () {
+    expect(SpecReader::path())->toEndWith('docs/specifications/weclapp-openapi_v2.json');
+});

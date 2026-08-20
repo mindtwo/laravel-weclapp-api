@@ -22,7 +22,6 @@ class QuotationFactory extends Factory
             'last_modified'    => $this->faker->dateTime(),
             'net_amount'       => $this->faker->randomFloat(2, 100, 100000),
             'quotation_number' => 'QU-'.$this->faker->unique()->numberBetween(10000, 99999),
-            'report_id'        => null,
             'status'           => $this->faker->randomElement(['OPEN', 'ACCEPTED', 'REJECTED']),
             'status_id'        => $this->faker->numberBetween(1, 3),
             'version'          => $this->faker->numberBetween(1, 5),

@@ -168,6 +168,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\Webhook;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WeclappOs;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WorkScheduleProfile;
 use Mindtwo\LaravelWeclappApi\Listeners\LogWeclappEvent;
+use Mindtwo\LaravelWeclappApi\Spec\SpecReader;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -369,9 +370,18 @@ class WeclappApiServiceProvider extends PackageServiceProvider
         $package
             ->name('laravel-weclapp-api')
             ->hasConfigFile()
-            ->hasCommand(WeclappMakeMirrorCommand::class)
             ->hasCommand(WeclappSyncCommand::class)
             ->hasCommand(WeclappUpdateCommand::class);
+
+        // weclapp:make-mirror is development tooling for this package, not a
+        // consumer command: it reads the spec under docs/ (export-ignored, so
+        // absent from a composer install) and writes into the package's own
+        // src/ and database/ — which for a consumer is inside vendor/.
+        // Registering it only when the spec is present keeps it out of consumer
+        // apps while leaving it available in a git checkout.
+        if (SpecReader::available()) {
+            $package->hasCommand(WeclappMakeMirrorCommand::class);
+        }
     }
 
     public function packageRegistered(): void

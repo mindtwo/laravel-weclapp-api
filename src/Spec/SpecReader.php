@@ -19,6 +19,23 @@ class SpecReader
     /** @var array<string, mixed>|null */
     private static ?array $spec = null;
 
+    public static function path(): string
+    {
+        return __DIR__.'/../../docs/specifications/weclapp-openapi_v2.json';
+    }
+
+    /**
+     * Whether the vendored spec is present.
+     *
+     * `.gitattributes` export-ignores /docs, so a `composer require` install has
+     * no spec. Anything spec-derived is therefore development-only tooling and
+     * has to check before assuming the file is there.
+     */
+    public static function available(): bool
+    {
+        return is_file(self::path());
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -28,10 +45,14 @@ class SpecReader
             return self::$spec;
         }
 
-        $path = __DIR__.'/../../docs/specifications/weclapp-openapi_v2.json';
+        $path = self::path();
 
         if (! is_file($path)) {
-            throw new RuntimeException("Vendored OpenAPI spec not found at {$path}.");
+            throw new RuntimeException(
+                'The vendored OpenAPI spec is missing. It lives under docs/, which is '
+                .'export-ignored, so it is only present in a git checkout of the package '
+                ."— not in a composer install. Expected it at {$path}."
+            );
         }
 
         /** @var array<string, mixed> $decoded */
