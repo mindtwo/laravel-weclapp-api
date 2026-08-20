@@ -10,6 +10,8 @@ guide will help you understand how to contribute effectively to this project.
 - [Development Setup](#development-setup)
 - [Coding Standards](#coding-standards)
 - [Adding New Endpoints](#adding-new-endpoints)
+- [Which entities have a mirror, and why](#which-entities-have-a-mirror-and-why)
+- [Adding a mirror entity or sync command](#adding-a-mirror-entity-or-sync-command)
 - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
 - [Reporting Issues](#reporting-issues)
@@ -340,6 +342,36 @@ The inherited methods return:
 
 The generic client (`WeclappClient::get()/find()/count()/post()`) already reaches
 any Weclapp resource, so a typed class is only about ergonomics and discoverability.
+
+## Which entities have a mirror, and why
+
+The package exposes a typed endpoint for **every** resource the API documents,
+but ships a mirror table for only nine: `Article`, `ArticleCategory`,
+`ArticlePrice`, `Party`, `Project`, `Quotation`, `SalesInvoice`, `SalesOrder`,
+`User`. That gap is deliberate, and the two layers answer different questions.
+
+An endpoint class is `$path` plus `$writes`, both derivable from the spec and
+kept honest by a single conformance test — 155 of them cost nothing to maintain.
+A mirror is a table, a field map, a factory and reconciliation semantics, and it
+encodes a judgement the spec cannot make: *which fields are worth storing.*
+`salesInvoice` resolves to 73 scalar columns; the shipped mirror keeps 25.
+
+**The criterion is a consumer.** An entity earns a mirror when something reads
+it, or when it is committed groundwork for work already agreed. The current nine
+are the entities cloudbase's original sync commands covered, plus the sales and
+pricing set added for the per-tenant storage work. Nothing was added on the
+grounds that it might be useful one day.
+
+That rule exists because it was once broken: `weclapp_amounts` and
+`weclapp_reports` were built without a reader, could never receive a row, and
+were removed in `df9b58b`. Generating all 119 mirror-able resources would be the
+same mistake at scale — 357 files, 2,095 columns and a `weclapp:sync` that would
+hammer every licensed module.
+
+Since the generator makes adding one a single command, there is no benefit to
+pre-building them. `MakeMirrorCommandTest` runs every resource in the spec
+through the blueprint and parses the generated output, so bulk generation is
+proven to work whenever a consumer actually needs it.
 
 ## Adding a mirror entity or sync command
 
