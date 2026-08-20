@@ -13,7 +13,6 @@ return new class extends Migration
         Schema::create('weclapp_quotations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('customer_id')->nullable();
-            $table->unsignedBigInteger('report_id')->nullable();
             $table->unsignedBigInteger('status_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
             $table->decimal('gross_amount', 12, 2)->nullable();
