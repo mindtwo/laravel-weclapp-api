@@ -212,6 +212,28 @@ stored in the unified `weclapp_parties` table.
 > (live-confirmed). Because it is undocumented, Weclapp gives no compatibility
 > guarantee for it.
 
+### What the sync layer does not cover
+
+A `SyncDefinition` maps the flat scalar fields of one Weclapp record into one row
+of one mirror table. That is the whole model, and it is deliberate. The following
+are **left to the consuming application**:
+
+- **Nested collections** — a party's addresses and contacts, an order's items,
+  bank accounts. These stay in the API response; the mirror does not unpack them.
+- **Fan-out to several models from one response** — a definition targets exactly
+  one model.
+- **Cross-entity resolution** — resolving a foreign key by looking up another
+  local table before saving.
+- **Domain side effects** — a mirror row is passive data, not application state.
+- **Derived data** — anything computed from Weclapp records rather than returned
+  by Weclapp.
+- **Reconciliation** — the sync is additive and upserts by weclapp id. It does not
+  prune rows that were deleted or archived remotely.
+
+If you need any of these, use the client and typed endpoints directly and project
+the response into your own schema. The mirror tables are for consumers that want a
+faithful local copy of Weclapp; they are not a prerequisite for using the package.
+
 ## Testing
 
 ```bash
