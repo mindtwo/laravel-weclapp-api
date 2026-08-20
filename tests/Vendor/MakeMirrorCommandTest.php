@@ -107,6 +107,23 @@ it('reports the files it would write without touching the filesystem', function 
     expect(file_exists($model))->toBeFalse();
 });
 
+it('prints package-relative paths on every platform', function () {
+    // realpath() returns backslashes on Windows. The first version of relative()
+    // string-matched an unnormalised root, so the prefix never matched there and
+    // the command printed absolute paths -- green on macOS, red on windows-latest.
+    $command = app()->make(Mindtwo\LaravelWeclappApi\Commands\WeclappMakeMirrorCommand::class);
+    $method = new ReflectionMethod($command, 'relative');
+
+    foreach (['/pkg/src/Models/Party.php', '\\pkg\\src\\Models\\Party.php'] as $separatorStyle) {
+        $root = (new ReflectionMethod($command, 'packageRoot'))->invoke($command);
+        $result = $method->invoke($command, $root.$separatorStyle);
+
+        expect($result)->not->toContain('\\')
+            ->and($result)->not->toStartWith('/')
+            ->and($result)->toBe('pkg/src/Models/Party.php');
+    }
+});
+
 // The package deliberately ships mirrors for only a handful of entities, but the
 // generator is the reason that stays a choice rather than a constraint. These two
 // prove bulk generation would work on demand, without committing 357 files nobody
@@ -178,12 +195,14 @@ it('generates syntactically valid php for every mirrored resource', function (st
         $method = new ReflectionMethod($command, $kind);
         $source = (string) $method->invoke($command, $blueprint);
 
-        $file = tempnam(sys_get_temp_dir(), 'mirror').'.php';
+        $stub = (string) tempnam(sys_get_temp_dir(), 'mirror');
+        $file = $stub.'.php';
         file_put_contents($file, $source);
         // escapeshellarg, not escapeshellcmd: Herd's PHP lives under a path with
         // a space in it, which escapeshellcmd does not quote.
         exec(escapeshellarg(PHP_BINARY).' -l '.escapeshellarg($file).' 2>&1', $output, $status);
         unlink($file);
+        unlink($stub);
 
         expect($status)->toBe(0, "{$resource} {$kind}: ".implode(' ', $output));
     }

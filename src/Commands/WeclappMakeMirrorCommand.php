@@ -415,13 +415,25 @@ class WeclappMakeMirrorCommand extends Command
         return (string) ($highest + 1);
     }
 
+    /**
+     * The package root with forward slashes on every platform.
+     *
+     * realpath() returns backslashes on Windows, so anything that string-matches
+     * a path has to normalise first — otherwise the root prefix never matches and
+     * the command prints absolute paths.
+     */
+    private function packageRoot(): string
+    {
+        return str_replace('\\', '/', (string) realpath(__DIR__.'/../..'));
+    }
+
     private function packagePath(string $relative): string
     {
-        return __DIR__.'/../../'.$relative;
+        return $this->packageRoot().'/'.$relative;
     }
 
     private function relative(string $path): string
     {
-        return str_replace(realpath($this->packagePath('')).'/', '', realpath(dirname($path)).'/'.basename($path));
+        return ltrim(str_replace($this->packageRoot(), '', str_replace('\\', '/', $path)), '/');
     }
 }
