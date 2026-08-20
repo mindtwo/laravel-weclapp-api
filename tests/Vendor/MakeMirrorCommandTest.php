@@ -199,13 +199,25 @@ it('generates syntactically valid php for every mirrored resource', function (st
         $stub = (string) tempnam(sys_get_temp_dir(), 'mirror');
         $file = $stub.'.php';
         file_put_contents($file, $source);
-        // escapeshellarg, not escapeshellcmd: Herd's PHP lives under a path with
-        // a space in it, which escapeshellcmd does not quote.
-        exec(escapeshellarg(PHP_BINARY).' -l '.escapeshellarg($file).' 2>&1', $output, $status);
+
+        // proc_open with an array command bypasses shell parsing on both
+        // platforms. Building a string for exec() means quoting it for cmd.exe,
+        // which mangles a line that both starts and ends with a quote -- and
+        // PHP_BINARY contains a space under Herd.
+        $process = proc_open(
+            [PHP_BINARY, '-l', $file],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
+
+        $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
+        array_map(fclose(...), $pipes);
+        $status = proc_close($process);
+
         unlink($file);
         unlink($stub);
 
-        expect($status)->toBe(0, "{$resource} {$kind}: ".implode(' ', $output));
+        expect($status)->toBe(0, "{$resource} {$kind}: ".trim($output));
     }
 })->with(['articlePrice', 'party']); // php -l cross-check, in case php-parser is absent
 
