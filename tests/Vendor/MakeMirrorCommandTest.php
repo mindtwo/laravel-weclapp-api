@@ -107,6 +107,69 @@ it('reports the files it would write without touching the filesystem', function 
     expect(file_exists($model))->toBeFalse();
 });
 
+// The package deliberately ships mirrors for only a handful of entities, but the
+// generator is the reason that stays a choice rather than a constraint. These two
+// prove bulk generation would work on demand, without committing 357 files nobody
+// reads. Both are exhaustive and cost well under a second.
+
+it('derives a usable blueprint for every resource in the spec', function () {
+    $checked = 0;
+
+    foreach (SpecReader::resources() as $resource) {
+        $blueprint = MirrorBlueprint::for($resource);
+
+        if ($blueprint->columns === []) {
+            continue; // lookup lists whose response refs the shared customValue schema
+        }
+
+        $names = array_column($blueprint->columns, 'name');
+
+        expect($names)->toBe(array_unique($names), "{$resource}: duplicate column name")
+            ->and($blueprint->table())->toStartWith('weclapp_');
+
+        foreach ($blueprint->columns as $column) {
+            expect($column['name'])->toMatch('/^[a-z][a-z0-9_]*$/', "{$resource}: bad column name");
+            expect($column['migration'])->toBeIn([
+                'unsignedBigInteger', 'integer', 'boolean', 'decimal', 'string', 'text', 'datetime',
+            ]);
+        }
+
+        // Every column is reachable by the synchronizer through exactly one of the
+        // two maps; a column in neither would silently never be filled.
+        expect(count($blueprint->map()) + count($blueprint->dates()))->toBe(count($blueprint->columns));
+
+        $checked++;
+    }
+
+    expect($checked)->toBeGreaterThan(100);
+});
+
+it('generates parseable php for every resource in the spec', function () {
+    $parser = (new PhpParser\ParserFactory)->createForNewestSupportedVersion();
+    $command = app()->make(Mindtwo\LaravelWeclappApi\Commands\WeclappMakeMirrorCommand::class);
+    $parsed = 0;
+
+    foreach (SpecReader::resources() as $resource) {
+        $blueprint = MirrorBlueprint::for($resource);
+
+        if ($blueprint->columns === []) {
+            continue;
+        }
+
+        foreach (['migration', 'model', 'factory'] as $kind) {
+            $source = (string) (new ReflectionMethod($command, $kind))->invoke($command, $blueprint);
+
+            expect(fn () => $parser->parse($source))
+                ->not->toThrow(Throwable::class, "{$resource} {$kind} does not parse");
+
+            $parsed++;
+        }
+    }
+
+    expect($parsed)->toBeGreaterThan(300);
+    // nikic/php-parser arrives with phpstan rather than being declared here.
+})->skip(! class_exists(PhpParser\ParserFactory::class), 'nikic/php-parser not installed');
+
 it('generates syntactically valid php for every mirrored resource', function (string $resource) {
     $command = app()->make(Mindtwo\LaravelWeclappApi\Commands\WeclappMakeMirrorCommand::class);
     $blueprint = MirrorBlueprint::for($resource);
@@ -124,4 +187,4 @@ it('generates syntactically valid php for every mirrored resource', function (st
 
         expect($status)->toBe(0, "{$resource} {$kind}: ".implode(' ', $output));
     }
-})->with(['articlePrice', 'salesInvoice', 'opportunity', 'party', 'ticket']);
+})->with(['articlePrice', 'party']); // php -l cross-check, in case php-parser is absent
