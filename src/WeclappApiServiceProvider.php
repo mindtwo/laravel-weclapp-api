@@ -7,6 +7,7 @@ namespace Mindtwo\LaravelWeclappApi;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
+use Mindtwo\LaravelWeclappApi\Commands\WeclappMakeMirrorCommand;
 use Mindtwo\LaravelWeclappApi\Commands\WeclappSyncCommand;
 use Mindtwo\LaravelWeclappApi\Commands\WeclappUpdateCommand;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
@@ -368,6 +369,7 @@ class WeclappApiServiceProvider extends PackageServiceProvider
         $package
             ->name('laravel-weclapp-api')
             ->hasConfigFile()
+            ->hasCommand(WeclappMakeMirrorCommand::class)
             ->hasCommand(WeclappSyncCommand::class)
             ->hasCommand(WeclappUpdateCommand::class);
     }
