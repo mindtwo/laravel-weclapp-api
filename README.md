@@ -37,14 +37,42 @@ Publish the config file:
 php artisan vendor:publish --tag="weclapp-api-config"
 ```
 
-The mirror-table migrations are **publish-only** (they are company-wide data and
-must not collide with a host app's own tables). Publish and run them only if you
-intend to use the mirror models / sync commands:
+The mirror-table migrations are **publish-only** (they must not collide with a
+host app's own tables). Publish and run them only if you intend to use the mirror
+models / sync commands.
+
+**Pick the tables you actually read** — each entity has its own tag, so you are
+not forced to take all nine:
+
+```bash
+php artisan vendor:publish --tag="weclapp-api-migrations-article-prices"
+php artisan vendor:publish --tag="weclapp-api-migrations-articles"
+php artisan migrate
+```
+
+| Tag suffix | Table |
+| --- | --- |
+| `parties` | `weclapp_parties` (backs both `customers` and `suppliers`) |
+| `article-categories` | `weclapp_article_categories` |
+| `articles` | `weclapp_articles` |
+| `users` | `weclapp_users` |
+| `quotations` | `weclapp_quotations` |
+| `sales-orders` | `weclapp_sales_orders` |
+| `projects` | `weclapp_projects` |
+| `article-prices` | `weclapp_article_prices` |
+| `sales-invoices` | `weclapp_sales_invoices` |
+
+Or take everything at once:
 
 ```bash
 php artisan vendor:publish --tag="weclapp-api-migrations"
 php artisan migrate
 ```
+
+Mirror tables have no foreign-key constraints between them — they correlate on
+`weclapp_id` — so publishing a subset is safe. The Eloquent relations (for
+example `ArticlePrice::article()`) simply return `null` if you did not publish
+the other side.
 
 ## Configuration
 
@@ -203,8 +231,9 @@ php artisan weclapp:update articles --since="2026-01-01 00:00:00"
 ```
 
 Supported sync entities: `customers`, `suppliers`, `article-categories`,
-`articles`, `users`, `quotations`, `sales-orders`, `projects`. Customers and
-suppliers are both read from `/party` (filtered on the respective flag) and
+`articles`, `users`, `quotations`, `sales-orders`, `projects`, `article-prices`,
+`sales-invoices`.
+Customers and suppliers are both read from `/party` (filtered on the respective flag) and
 stored in the unified `weclapp_parties` table.
 
 > **`projects` is undocumented but real.** The `project` resource appears nowhere
@@ -233,6 +262,22 @@ are **left to the consuming application**:
 If you need any of these, use the client and typed endpoints directly and project
 the response into your own schema. The mirror tables are for consumers that want a
 faithful local copy of Weclapp; they are not a prerequisite for using the package.
+
+### Adding a mirror for another entity
+
+Only a few of the 155 resources ship with a mirror table. Scaffold one from the
+vendored OpenAPI spec rather than hand-writing it:
+
+```bash
+php artisan weclapp:make-mirror articlePrice
+php artisan weclapp:make-mirror salesInvoice --dry              # preview
+php artisan weclapp:make-mirror ticket --only=id,subject        # trim up front
+```
+
+It writes the migration, model and factory with types, string lengths and
+factory enum values taken from the spec, skips nested collections, and prints
+the `SyncRegistry` entry to paste. Treat the output as a starting point and trim
+the columns you will not read.
 
 ## Testing
 
