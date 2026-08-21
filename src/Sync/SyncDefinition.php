@@ -16,6 +16,8 @@ final readonly class SyncDefinition
      * @param class-string<Model> $model The mirror model to upsert into
      * @param array<string, string> $map column => API field (scalar copy)
      * @param array<string, string> $dates column => API field (epoch-ms datetime)
+     * @param array<string, string> $paths column => dot-path to a scalar nested inside
+     *                                     the record, e.g. `reductionAdditions.0.value`
      * @param array<string, mixed> $defaults column => static value applied to every record
      * @param array<string, mixed> $filters query filters narrowing a shared resource to this entity
      * @param string $key The mirror column used to match existing rows (its API field must be in $map)
@@ -25,6 +27,7 @@ final readonly class SyncDefinition
         public string $model,
         public array $map,
         public array $dates = [],
+        public array $paths = [],
         public array $defaults = [],
         public array $filters = [],
         public string $key = 'weclapp_id',
@@ -51,6 +54,14 @@ final readonly class SyncDefinition
                     (int) $record->{$field},
                     (string) config('weclapp-api.timezone', 'UTC'),
                 );
+            }
+        }
+
+        foreach ($this->paths as $column => $path) {
+            $value = data_get($record, $path);
+
+            if ($value !== null) {
+                $attributes[$column] = $value;
             }
         }
 

@@ -27,6 +27,8 @@ class ArticlePriceFactory extends Factory
             'price'                    => $this->faker->randomFloat(4, 1, 5000),
             'price_scale_type'         => 'SCALE_FROM',
             'price_scale_value'        => $this->faker->randomFloat(4, 1, 1000),
+            'reduction_type'           => null,
+            'reduction_value'          => null,
             'sales_channel'            => 'NET1',
             'start_date'               => null,
             'version'                  => $this->faker->numberBetween(1, 5),
@@ -41,6 +43,18 @@ class ArticlePriceFactory extends Factory
     {
         return $this->state(fn (): array => [
             'customer_id' => $customerId ?? $this->faker->numberBetween(10000, 99999),
+        ]);
+    }
+
+    /**
+     * A price carrying the percentage reduction Weclapp keeps in
+     * reductionAdditions — the shape 96% of customer-specific prices have live.
+     */
+    public function reduced(?float $percent = null): static
+    {
+        return $this->state(fn (): array => [
+            'reduction_type'  => 'REDUCTION_PERCENT',
+            'reduction_value' => $percent ?? $this->faker->randomElement([6.5, 7.5, 12, 15, 25, 30]),
         ]);
     }
 

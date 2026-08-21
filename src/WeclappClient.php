@@ -6,6 +6,7 @@ namespace Mindtwo\LaravelWeclappApi;
 
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -246,6 +247,31 @@ class WeclappClient
         $response->throw();
 
         return $response->object();
+    }
+
+    /**
+     * Fetch a binary document from a resource sub-path, e.g. an article's main
+     * image at `article/id/{id}/downloadMainArticleImage`.
+     *
+     * Returns null when Weclapp has no such document (404), so a caller can fall
+     * back to its own copy without catching. Any other failure still throws —
+     * a 403 or a timeout is not the same answer as "there is no image".
+     *
+     * @param array<string, mixed> $params
+     *
+     * @throws RequestException
+     */
+    public function download(string $path, array $params = []): ?Response
+    {
+        $response = $this->client()->get($this->path($path), $params);
+
+        if ($response->notFound()) {
+            return null;
+        }
+
+        $response->throw();
+
+        return $response;
     }
 
     /**

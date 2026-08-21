@@ -25,6 +25,11 @@ return new class extends Migration
             $table->decimal('price', 12, 4)->nullable();
             $table->string('price_scale_type')->nullable();
             $table->decimal('price_scale_value', 12, 4)->nullable();
+            // Flattened from the nested reductionAdditions collection, which never
+            // carries more than one entry. REDUCTION_PERCENT or ADDITION_PERCENT,
+            // applied as a percentage of `price`.
+            $table->string('reduction_type')->nullable();
+            $table->decimal('reduction_value', 8, 4)->nullable();
             $table->string('sales_channel')->nullable();
             $table->datetime('start_date')->nullable();
             $table->integer('version')->nullable();

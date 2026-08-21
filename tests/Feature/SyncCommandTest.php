@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
 use Mindtwo\LaravelWeclappApi\Models\Article;
+use Mindtwo\LaravelWeclappApi\Models\ArticlePrice;
 use Mindtwo\LaravelWeclappApi\Models\Party;
 use Mindtwo\LaravelWeclappApi\Models\Quotation;
 
@@ -107,6 +108,51 @@ it('maps a quotation, taking version from quotationVersion', function () {
     expect($quotation->weclapp_id)->toBe(40001)
         ->and($quotation->quotation_number)->toBe('QU-10001')
         ->and($quotation->version)->toBe(3);
+});
+
+it('flattens the price-relevant reductionAdditions entry onto the price row', function () {
+    Http::fake(['*articlePrice*' => Http::response(['result' => [[
+        'id'                 => 152796,
+        'articleId'          => 7371,
+        'customerId'         => 4983,
+        'currencyId'         => 248,
+        'price'              => '3500',
+        'priceScaleType'     => 'SCALE_FROM',
+        'priceScaleValue'    => '0',
+        'salesChannel'       => 'NET1',
+        'reductionAdditions' => [[
+            'id'    => 152797,
+            'type'  => 'REDUCTION_PERCENT',
+            'value' => '22',
+        ]],
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync article-prices')->assertSuccessful();
+
+    $price = ArticlePrice::query()->firstOrFail();
+
+    expect($price->weclapp_id)->toBe(152796)
+        ->and($price->customer_id)->toBe(4983)
+        ->and($price->price)->toEqual('3500.0000')
+        ->and($price->reduction_type)->toBe('REDUCTION_PERCENT')
+        ->and($price->reduction_value)->toEqual('22.0000');
+});
+
+it('leaves the reduction columns null on a price without reductionAdditions', function () {
+    Http::fake(['*articlePrice*' => Http::response(['result' => [[
+        'id'                 => 152800,
+        'articleId'          => 7371,
+        'price'              => '4000',
+        'reductionAdditions' => [],
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync article-prices')->assertSuccessful();
+
+    $price = ArticlePrice::query()->firstOrFail();
+
+    expect($price->customer_id)->toBeNull()
+        ->and($price->reduction_type)->toBeNull()
+        ->and($price->reduction_value)->toBeNull();
 });
 
 it('fails on an unknown entity', function () {

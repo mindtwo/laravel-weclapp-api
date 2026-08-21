@@ -22,6 +22,8 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticlePriceFactory;
  * @property string|null $price
  * @property string|null $price_scale_type
  * @property string|null $price_scale_value
+ * @property string|null $reduction_type
+ * @property string|null $reduction_value
  * @property string|null $sales_channel
  * @property \Illuminate\Support\Carbon|null $start_date
  * @property int|null $version
@@ -46,6 +48,8 @@ class ArticlePrice extends Model
         'price',
         'price_scale_type',
         'price_scale_value',
+        'reduction_type',
+        'reduction_value',
         'sales_channel',
         'start_date',
         'version',
@@ -87,6 +91,7 @@ class ArticlePrice extends Model
             'last_modified_by_user_id' => 'integer',
             'price'                    => 'decimal:4',
             'price_scale_value'        => 'decimal:4',
+            'reduction_value'          => 'decimal:4',
             'start_date'               => 'datetime',
             'version'                  => 'integer',
             'weclapp_id'               => 'integer',
