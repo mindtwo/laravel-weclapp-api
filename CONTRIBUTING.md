@@ -493,10 +493,11 @@ ticket(s):
   `refactor`, `build`, `ci`. Append `!` and add a `BREAKING-CHANGE:` trailer for
   anything that breaks consumers.
 - Blank line, then a body explaining *why*, not restating the diff.
-- Internal work carries a `ticket(s):` trailer derived from the branch name. It
-  belongs in the **body only** — never the subject, which would publish ClickUp
-  ids to Packagist. External contributors should reference GitHub issues instead
-  (`Fixes #123`).
+- Internal work carries a `ticket(s):` trailer derived from the branch name.
+  **Ticket references belong in the body only, never in the subject** — squashed
+  commits included. Beyond the convention, semantic-release copies the subject
+  into the published `CHANGELOG.md`. External contributors should reference
+  GitHub issues instead (`Fixes #123`).
 
 GrumPHP validates the subject on commit.
 
