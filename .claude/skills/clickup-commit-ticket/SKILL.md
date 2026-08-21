@@ -21,7 +21,7 @@ ticket(s):
 - `%id%` is the ClickUp task id taken from the current branch name.
 - The link text uses the lowercase prefix `sd-%id%`; the URL path uses the uppercase `SD-%id%`. The team/workspace segment `30379192` is fixed — never change it.
 - The label is `ticket(s):` (plural-aware): if a branch legitimately references more than one ticket, add one indented `- [...]` line per ticket. Normally there is exactly one.
-- This block goes in the commit **body**, never the subject — the subject stays a valid Conventional-Commit line (`type(scope): summary`, ≤120 chars, so the GrumPHP commit-msg hook passes).
+- **Ticket information never appears in the subject line, in any commit.** The block goes in the commit **body**; the subject stays a valid Conventional-Commit line (`type(scope): summary`, ≤120 chars, so the GrumPHP commit-msg hook passes). This holds for squashed commits too — see below.
 
 ## Deriving the ticket id from the branch
 
@@ -50,20 +50,15 @@ Do NOT silently commit without the ticket trailer.
 ## Squashing commits
 
 When collapsing several commits into one (e.g. tidying a branch before a PR or
-merge), the squashed commit follows an **extended schema** — the same one used for
-the SD-114009 ACL refactor. It differs from a normal single commit in three ways:
+merge), the squashed commit follows an **extended schema**. The subject rule does
+not change — a squashed subject is still a plain `type(scope): summary` with no
+ticket id in it. Only the body and trailer differ:
 
-1. ~~**Subject carries the ticket id.**~~ **Does not apply in this repository.**
-   `mindtwo/laravel-weclapp-api` releases through semantic-release, which parses
-   the Conventional-Commit subject to pick the version bump and copies it verbatim
-   into `CHANGELOG.md`. Putting `SD-%id%` in the subject would publish internal
-   ClickUp ids to Packagist. Keep the id in the trailer for squashed commits too;
-   the subject stays a plain `type(scope): summary`.
-2. **Body is a `Squashed commits:` list.** Under a `Squashed commits:` header, add
+1. **Body is a `Squashed commits:` list.** Under a `Squashed commits:` header, add
    one 4-space-indented bullet per squashed commit, each preserving that commit's
    original subject line, in order. Do **not** replace this list with hand-written
    prose — the list *is* the body.
-3. **Trailer lists every referenced ticket.** Keep the usual `ticket(s):` block,
+2. **Trailer lists every referenced ticket.** Keep the usual `ticket(s):` block,
    but include *every distinct* ticket referenced across the squashed commits —
    primary (branch) ticket first, deduplicated, one 4-space-indented
    `- [sd-%id%](https://app.clickup.com/t/30379192/SD-%id%)` line each. If all the
@@ -94,7 +89,7 @@ untouched.
 - **Never** add a `Co-Authored-By: Claude …` trailer (or any AI co-author line) to commit messages in this project — it is forbidden by organization policy. The ticket block is the only required trailer.
 - The ticket trailer is mandatory on every commit unless the user has explicitly confirmed the work has no ticket.
 - Keep the Conventional-Commit subject intact and the ticket block in the body so the commit-msg hook passes.
-- **This repository publishes to Packagist via semantic-release.** The subject line
-  becomes the public changelog entry, so it must stay free of ClickUp ids and
-  internal shorthand. The `ticket(s):` trailer is unaffected — it lives in the body,
-  which semantic-release does not surface.
+- **Never put a ticket id, or any ticket reference, in the subject line.** No
+  exceptions, squashes included. Here it also has a concrete cost: semantic-release
+  turns the subject into the published `CHANGELOG.md` entry. The `ticket(s):`
+  trailer is unaffected — it lives in the body, which semantic-release ignores.
