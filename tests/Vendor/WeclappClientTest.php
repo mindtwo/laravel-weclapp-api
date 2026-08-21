@@ -83,3 +83,27 @@ it('throws when a generic write fails', function () {
 
     WeclappClient::put('ticket', 1, []);
 })->throws(RequestException::class);
+
+it('downloads a binary document from a resource sub-path', function () {
+    Http::fake(['*downloadMainArticleImage*' => Http::response('binary-jpeg-bytes', 200, [
+        'Content-Type' => 'image/jpeg',
+    ])]);
+
+    $response = app(Client::class)->download('article/id/1964/downloadMainArticleImage');
+
+    expect($response)->not->toBeNull()
+        ->and($response->body())->toBe('binary-jpeg-bytes')
+        ->and($response->header('Content-Type'))->toBe('image/jpeg');
+});
+
+it('returns null when downloading a document that does not exist', function () {
+    Http::fake(['*downloadMainArticleImage*' => Http::response('', 404)]);
+
+    expect(app(Client::class)->download('article/id/999/downloadMainArticleImage'))->toBeNull();
+});
+
+it('throws when a download is refused rather than reporting no document', function () {
+    Http::fake(['*downloadMainArticleImage*' => Http::response('', 403)]);
+
+    app(Client::class)->download('article/id/1964/downloadMainArticleImage');
+})->throws(RequestException::class);

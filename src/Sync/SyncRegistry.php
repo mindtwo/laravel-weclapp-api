@@ -160,7 +160,13 @@ final class SyncRegistry
             ),
             // customerId is present only on customer-specific prices; Weclapp omits
             // null fields entirely, so the synchronizer leaves the column null for
-            // list prices. reductionAdditions is a nested collection and is skipped.
+            // list prices.
+            //
+            // reductionAdditions is a nested collection, but unlike the other nested
+            // collections it changes the price, so it is flattened rather than
+            // skipped: a live full read found it on 358 of 967 rows, 354 of them on
+            // customer-specific prices, and never more than one entry per row.
+            // Dropping it would mirror the wrong price for 96% of customer overrides.
             'article-prices' => new SyncDefinition(
                 endpoint: 'articlePrice',
                 model: ArticlePrice::class,
@@ -181,6 +187,10 @@ final class SyncRegistry
                     'end_date'      => 'endDate',
                     'last_modified' => 'lastModifiedDate',
                     'start_date'    => 'startDate',
+                ],
+                paths: [
+                    'reduction_type'  => 'reductionAdditions.0.type',
+                    'reduction_value' => 'reductionAdditions.0.value',
                 ],
             ),
             'sales-invoices' => new SyncDefinition(
