@@ -6,6 +6,7 @@ namespace Mindtwo\LaravelWeclappApi\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Mindtwo\LaravelWeclappApi\Database\Factories\UserFactory;
 
 /**
@@ -17,11 +18,13 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\UserFactory;
  * @property string|null $last_name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
  */
 class User extends Model
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
+    use SoftDeletes;
 
     protected $table = 'weclapp_users';
 

@@ -36,6 +36,11 @@ final class SyncRegistry
     public static function all(): array
     {
         return [
+            // customers and suppliers are the only two definitions sharing a model,
+            // and that is exactly why neither reconciles: each fetches its own
+            // filtered slice of /party, so letting either archive "everything I did
+            // not see" would wipe the other's rows on every run. Every other
+            // definition below owns its table outright and can reconcile safely.
             'customers' => new SyncDefinition(
                 endpoint: 'party',
                 model: Party::class,
@@ -79,6 +84,7 @@ final class SyncRegistry
                     'name'       => 'name',
                     'weclapp_id' => 'id',
                 ],
+                reconciles: true,
             ),
             'articles' => new SyncDefinition(
                 endpoint: 'article',
@@ -93,6 +99,7 @@ final class SyncRegistry
                     'weclapp_id'          => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
+                reconciles: true,
             ),
             'users' => new SyncDefinition(
                 endpoint: 'user',
@@ -104,6 +111,7 @@ final class SyncRegistry
                     'weclapp_id' => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
+                reconciles: true,
             ),
             'quotations' => new SyncDefinition(
                 endpoint: 'quotation',
@@ -118,6 +126,7 @@ final class SyncRegistry
                     'weclapp_id'       => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
+                reconciles: true,
             ),
             'sales-orders' => new SyncDefinition(
                 endpoint: 'salesOrder',
@@ -141,6 +150,7 @@ final class SyncRegistry
                     'service_period_from' => 'servicePeriodFrom',
                     'service_period_to'   => 'servicePeriodTo',
                 ],
+                reconciles: true,
             ),
             'projects' => new SyncDefinition(
                 endpoint: 'project',
@@ -157,6 +167,7 @@ final class SyncRegistry
                     'last_modified'      => 'lastModifiedDate',
                     'project_start_date' => 'projectStartDate',
                 ],
+                reconciles: true,
             ),
             // customerId is present only on customer-specific prices; Weclapp omits
             // null fields entirely, so the synchronizer leaves the column null for
@@ -192,6 +203,7 @@ final class SyncRegistry
                     'reduction_type'  => 'reductionAdditions.0.type',
                     'reduction_value' => 'reductionAdditions.0.value',
                 ],
+                reconciles: true,
             ),
             'sales-invoices' => new SyncDefinition(
                 endpoint: 'salesInvoice',
@@ -225,6 +237,7 @@ final class SyncRegistry
                     'service_period_to'   => 'servicePeriodTo',
                     'shipping_date'       => 'shippingDate',
                 ],
+                reconciles: true,
             ),
         ];
     }

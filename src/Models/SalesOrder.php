@@ -7,6 +7,7 @@ namespace Mindtwo\LaravelWeclappApi\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Mindtwo\LaravelWeclappApi\Database\Factories\SalesOrderFactory;
 
 /**
@@ -28,11 +29,13 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\SalesOrderFactory;
  * @property int|null $version
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
  */
 class SalesOrder extends Model
 {
     /** @use HasFactory<SalesOrderFactory> */
     use HasFactory;
+    use SoftDeletes;
 
     protected $table = 'weclapp_sales_orders';
 

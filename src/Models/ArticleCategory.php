@@ -7,6 +7,7 @@ namespace Mindtwo\LaravelWeclappApi\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleCategoryFactory;
 
 /**
@@ -15,11 +16,13 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleCategoryFactory;
  * @property string|null $name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
  */
 class ArticleCategory extends Model
 {
     /** @use HasFactory<ArticleCategoryFactory> */
     use HasFactory;
+    use SoftDeletes;
 
     protected $table = 'weclapp_article_categories';
 

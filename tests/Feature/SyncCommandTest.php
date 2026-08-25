@@ -170,3 +170,92 @@ it('sends a delta filter when updating', function () {
 
     expect(Quotation::query()->count())->toBe(0);
 });
+
+it('archives mirror rows Weclapp no longer returns', function () {
+    Article::factory()->create(['weclapp_id' => 20001, 'article_number' => 'STILL-THERE']);
+    Article::factory()->create(['weclapp_id' => 20002, 'article_number' => 'GONE-FROM-WECLAPP']);
+
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id'            => 20001,
+        'articleNumber' => 'STILL-THERE',
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')
+        ->expectsOutputToContain('Archived 1 articles no longer in Weclapp.')
+        ->assertSuccessful();
+
+    expect(Article::query()->count())->toBe(1)
+        ->and(Article::query()->firstOrFail()->weclapp_id)->toBe(20001)
+        ->and(Article::withTrashed()->where('weclapp_id', 20002)->firstOrFail()->deleted_at)->not->toBeNull();
+});
+
+it('restores an archived row onto itself when the record comes back', function () {
+    $article = Article::factory()->create(['weclapp_id' => 20002, 'article_number' => 'OLD']);
+    $article->delete();
+
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id'            => 20002,
+        'articleNumber' => 'BACK-AGAIN',
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    // Restored in place rather than inserted alongside the archived row.
+    expect(Article::withTrashed()->count())->toBe(1)
+        ->and(Article::query()->firstOrFail()->article_number)->toBe('BACK-AGAIN')
+        ->and(Article::query()->firstOrFail()->id)->toBe($article->id);
+});
+
+it('never archives on a delta sync, where a partial result is the whole point', function () {
+    Article::factory()->create(['weclapp_id' => 20001]);
+    Article::factory()->create(['weclapp_id' => 20002]);
+
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id' => 20001,
+    ]]], 200)]);
+
+    $this->artisan('weclapp:update articles --since=2026-01-01')->assertSuccessful();
+
+    expect(Article::query()->count())->toBe(2);
+});
+
+it('never archives on an empty response, which cannot be told apart from an outage', function () {
+    Article::factory()->create(['weclapp_id' => 20001]);
+    Article::factory()->create(['weclapp_id' => 20002]);
+
+    Http::fake(['*article*' => Http::response(['result' => []], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    expect(Article::query()->count())->toBe(2);
+});
+
+it('does not archive across definitions that share a model', function () {
+    // customers and suppliers are both filtered views of /party. A customer sync
+    // that archived "everything unseen" would take every supplier with it.
+    Party::factory()->create(['weclapp_id' => 70001, 'supplier_number' => 'SU-1', 'customer_number' => null]);
+
+    Http::fake(['*party*' => Http::response(['result' => [[
+        'id'             => 12345,
+        'customerNumber' => 'C10001',
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync customers')->assertSuccessful();
+
+    expect(Party::query()->count())->toBe(2)
+        ->and(Party::query()->where('weclapp_id', 70001)->exists())->toBeTrue();
+});
+
+it('reports nothing archived when the mirror already matches', function () {
+    Article::factory()->create(['weclapp_id' => 20001]);
+
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id' => 20001,
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')
+        ->doesntExpectOutputToContain('Archived')
+        ->assertSuccessful();
+
+    expect(Article::withTrashed()->count())->toBe(1);
+});

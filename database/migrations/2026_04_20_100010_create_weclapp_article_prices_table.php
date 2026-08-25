@@ -34,6 +34,8 @@ return new class extends Migration
             $table->datetime('start_date')->nullable();
             $table->integer('version')->nullable();
             $table->timestamps();
+            // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
+            $table->softDeletes();
         });
     }
 

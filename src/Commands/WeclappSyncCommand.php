@@ -29,9 +29,13 @@ class WeclappSyncCommand extends Command
         }
 
         foreach ($definitions as $slug => $definition) {
-            $count = $this->synchronizer->sync($definition);
+            $result = $this->synchronizer->sync($definition);
 
-            $this->info(sprintf('Synced %d %s.', $count, $slug));
+            $this->info(sprintf('Synced %d %s.', $result['synced'], $slug));
+
+            if ($result['archived'] > 0) {
+                $this->warn(sprintf('Archived %d %s no longer in Weclapp.', $result['archived'], $slug));
+            }
         }
 
         return self::SUCCESS;
