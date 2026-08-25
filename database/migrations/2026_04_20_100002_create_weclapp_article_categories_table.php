@@ -15,6 +15,8 @@ return new class extends Migration
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
             $table->string('name')->nullable();
             $table->timestamps();
+            // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
+            $table->softDeletes();
         });
     }
 

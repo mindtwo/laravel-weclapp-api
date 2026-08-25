@@ -21,6 +21,8 @@ return new class extends Migration
             $table->string('status')->nullable();
             $table->string('title')->nullable();
             $table->timestamps();
+            // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
+            $table->softDeletes();
         });
     }
 

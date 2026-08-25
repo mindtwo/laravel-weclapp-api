@@ -29,6 +29,8 @@ return new class extends Migration
             $table->string('supplier_number')->nullable();
             $table->string('website')->nullable();
             $table->timestamps();
+            // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
+            $table->softDeletes();
         });
     }
 

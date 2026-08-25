@@ -38,9 +38,9 @@ class WeclappUpdateCommand extends Command
                 ? ['lastModifiedDate-gt' => $sinceMs]
                 : [];
 
-            $count = $this->synchronizer->sync($definition, $filters);
+            $result = $this->synchronizer->sync($definition, $filters);
 
-            $this->info(sprintf('Updated %d %s.', $count, $slug));
+            $this->info(sprintf('Updated %d %s.', $result['synced'], $slug));
         }
 
         return self::SUCCESS;

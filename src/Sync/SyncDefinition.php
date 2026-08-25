@@ -21,6 +21,10 @@ final readonly class SyncDefinition
      * @param array<string, mixed> $defaults column => static value applied to every record
      * @param array<string, mixed> $filters query filters narrowing a shared resource to this entity
      * @param string $key The mirror column used to match existing rows (its API field must be in $map)
+     * @param bool $reconciles Whether a full sync may soft-delete mirror rows Weclapp
+     *                         no longer returns. Only safe when this definition owns
+     *                         every row in the model's table — two definitions sharing
+     *                         a model would each treat the other's rows as stale.
      */
     public function __construct(
         public string $endpoint,
@@ -31,6 +35,7 @@ final readonly class SyncDefinition
         public array $defaults = [],
         public array $filters = [],
         public string $key = 'weclapp_id',
+        public bool $reconciles = false,
     ) {}
 
     /**

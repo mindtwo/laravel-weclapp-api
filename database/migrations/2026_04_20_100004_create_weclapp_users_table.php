@@ -18,6 +18,8 @@ return new class extends Migration
             $table->datetime('last_modified')->nullable();
             $table->string('last_name')->nullable();
             $table->timestamps();
+            // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
+            $table->softDeletes();
         });
     }
 
