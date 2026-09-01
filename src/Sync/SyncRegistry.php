@@ -117,6 +117,7 @@ final class SyncRegistry
                 derive: [
                     'main_image_id'       => fn (object $record): mixed => self::mainImageField($record, 'id'),
                     'main_image_filename' => fn (object $record): mixed => self::mainImageField($record, 'fileName'),
+                    'supply_source_count' => fn (object $record): mixed => self::countOf($record, 'supplySources'),
                 ],
                 reconciles: true,
             ),
@@ -259,6 +260,20 @@ final class SyncRegistry
                 reconciles: true,
             ),
         ];
+    }
+
+    /**
+     * How many entries a nested collection holds.
+     *
+     * Only the count is mirrored, not the collection: the consumer's question is
+     * whether the collection is empty, because a non-empty `supplySources` makes the
+     * article unwritable through the API.
+     */
+    private static function countOf(object $record, string $collection): int
+    {
+        $value = data_get($record, $collection);
+
+        return is_countable($value) ? count($value) : 0;
     }
 
     /**

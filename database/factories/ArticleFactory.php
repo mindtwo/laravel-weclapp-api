@@ -31,6 +31,7 @@ class ArticleFactory extends Factory
             'main_image_id'       => null,
             'name'                => $this->faker->words(3, true),
             'short_description_1' => null,
+            'supply_source_count' => 0,
             'unit_id'             => $this->faker->numberBetween(1, 10),
             'weclapp_id'          => $this->faker->unique()->numberBetween(10000, 99999),
         ];

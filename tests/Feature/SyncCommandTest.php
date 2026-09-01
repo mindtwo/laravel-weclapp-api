@@ -253,6 +253,34 @@ it('mirrors both text fields Weclapp holds for only some articles', function () 
         ->and($without->long_text)->toBeNull();
 });
 
+it('counts the supplySources collection, which decides whether the article is writable', function () {
+    // Weclapp demands primarySupplySourceId once a supplySource exists and does not
+    // return that field on a read, so a non-zero count means the record cannot be
+    // written back at all. A consumer has to be able to see that without an API call.
+    Http::fake(['*article*' => Http::response(['result' => [
+        [
+            'id'            => 20001,
+            'supplySources' => [
+                ['id' => 1, 'articleSupplySourceId' => 9001, 'positionNumber' => 1],
+                ['id' => 2, 'articleSupplySourceId' => 9002, 'positionNumber' => 2],
+            ],
+        ],
+        [
+            'id'            => 20002,
+            'supplySources' => [],
+        ],
+        [
+            'id' => 20003,
+        ],
+    ]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    expect(Article::query()->where('weclapp_id', 20001)->firstOrFail()->supply_source_count)->toBe(2)
+        ->and(Article::query()->where('weclapp_id', 20002)->firstOrFail()->supply_source_count)->toBe(0)
+        ->and(Article::query()->where('weclapp_id', 20003)->firstOrFail()->supply_source_count)->toBe(0);
+});
+
 it('fails on an unknown entity', function () {
     $this->artisan('weclapp:sync nope')
         ->expectsOutputToContain('Unknown entity "nope"')
