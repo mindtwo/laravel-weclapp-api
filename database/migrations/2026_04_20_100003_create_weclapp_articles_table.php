@@ -27,6 +27,12 @@ return new class extends Migration
             $table->string('main_image_filename', 1000)->nullable();
             $table->string('name', 300)->nullable();
             $table->text('short_description_1')->nullable();
+            // Count of the nested supplySources collection. Flattened for the same
+            // reason as the main image: a consumer listing many articles has to know
+            // this without an API call each. It decides whether the article can be
+            // written at all — Weclapp requires primarySupplySourceId once a
+            // supplySource exists, and does not return that field on a read.
+            $table->unsignedInteger('supply_source_count')->default(0);
             $table->timestamps();
             // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
             $table->softDeletes();

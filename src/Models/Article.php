@@ -14,6 +14,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleFactory;
  * @property int $id
  * @property int|null $article_category_id
  * @property int|null $main_image_id
+ * @property int $supply_source_count
  * @property int|null $unit_id
  * @property int|null $weclapp_id
  * @property bool $active
@@ -47,6 +48,7 @@ class Article extends Model
         'main_image_id',
         'name',
         'short_description_1',
+        'supply_source_count',
         'unit_id',
         'weclapp_id',
     ];
@@ -74,6 +76,7 @@ class Article extends Model
             'article_category_id' => 'integer',
             'last_modified'       => 'datetime',
             'main_image_id'       => 'integer',
+            'supply_source_count' => 'integer',
             'unit_id'             => 'integer',
             'weclapp_id'          => 'integer',
         ];
