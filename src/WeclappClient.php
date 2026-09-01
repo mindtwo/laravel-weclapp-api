@@ -322,7 +322,13 @@ class WeclappClient
     }
 
     /**
-     * Immediately PUT data to a record, replacing it.
+     * Immediately PUT data to a record, replacing it. When $dryRun is true
+     * Weclapp validates the payload without persisting it (server-side dry run).
+     *
+     * A dry run is still a PUT against the live tenant, so write suppression
+     * covers it too: an environment that may not write may not validate either,
+     * and a caller that needs to tell the difference must check
+     * writesSuppressed() rather than read anything into the empty return.
      *
      * @param array<string, mixed> $data
      *
@@ -330,7 +336,7 @@ class WeclappClient
      *
      * @return array<string, mixed>
      */
-    public function put(string $endpoint, string|int $id, array $data): array
+    public function put(string $endpoint, string|int $id, array $data, bool $dryRun = false): array
     {
         if ($this->writesSuppressed()) {
             $this->recordSuppressedWrite('PUT', $endpoint);
@@ -338,7 +344,60 @@ class WeclappClient
             return [];
         }
 
-        $response = $this->client()->put($this->recordPath($endpoint, $id), $data);
+        $path = $this->recordPath($endpoint, $id);
+
+        if ($dryRun) {
+            $path .= '?dryRun=true';
+        }
+
+        $response = $this->client()->put($path, $data);
+
+        $response->throw();
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Upload a binary document to a resource sub-path, e.g. an article image at
+     * `article/id/{id}/uploadArticleImage`.
+     *
+     * Weclapp does not take multipart here. The bytes are the raw request body
+     * and the filename is the required `name` query parameter, so both are sent
+     * that way; $params carries the rest of the query (`mainImage`,
+     * `articleImageId`). $contentType has to describe the bytes — the endpoint
+     * declares `image/jpeg`, `image/png` and `application/pdf` alongside a
+     * wildcard, so the default only applies when the caller does not know.
+     *
+     * Returns null on a 404, so a caller can tell "no such record" from a
+     * refusal without catching, as with download().
+     *
+     * @param array<string, mixed> $params
+     *
+     * @throws RequestException
+     *
+     * @return array<string, mixed>|null
+     */
+    public function upload(
+        string $path,
+        string $contents,
+        string $filename,
+        string $contentType = 'application/octet-stream',
+        array $params = [],
+    ): ?array {
+        if ($this->writesSuppressed()) {
+            $this->recordSuppressedWrite('POST', $path);
+
+            return [];
+        }
+
+        $response = $this->client()
+            ->withBody($contents, $contentType)
+            ->withQueryParameters([...$params, 'name' => $filename])
+            ->post($this->path($path));
+
+        if ($response->notFound()) {
+            return null;
+        }
 
         $response->throw();
 
