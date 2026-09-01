@@ -13,13 +13,17 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleFactory;
 /**
  * @property int $id
  * @property int|null $article_category_id
+ * @property int|null $main_image_id
  * @property int|null $unit_id
  * @property int|null $weclapp_id
  * @property bool $active
  * @property string|null $article_number
  * @property string|null $description
  * @property \Illuminate\Support\Carbon|null $last_modified
+ * @property string|null $long_text
+ * @property string|null $main_image_filename
  * @property string|null $name
+ * @property string|null $short_description_1
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $deleted_at
@@ -38,7 +42,11 @@ class Article extends Model
         'article_number',
         'description',
         'last_modified',
+        'long_text',
+        'main_image_filename',
+        'main_image_id',
         'name',
+        'short_description_1',
         'unit_id',
         'weclapp_id',
     ];
@@ -65,6 +73,7 @@ class Article extends Model
             'active'              => 'boolean',
             'article_category_id' => 'integer',
             'last_modified'       => 'datetime',
+            'main_image_id'       => 'integer',
             'unit_id'             => 'integer',
             'weclapp_id'          => 'integer',
         ];

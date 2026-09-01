@@ -155,6 +155,104 @@ it('leaves the reduction columns null on a price without reductionAdditions', fu
         ->and($price->reduction_value)->toBeNull();
 });
 
+it('flattens the flagged main image onto the article row', function () {
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id'            => 20001,
+        'articleNumber' => 'ART-001',
+        'articleImages' => [
+            [
+                'id'        => 1965,
+                'fileName'  => 'streetlight-1388418_1920.jpg',
+                'mainImage' => false,
+            ],
+            [
+                'id'        => 2052097,
+                'fileName'  => 'header.jpeg',
+                'mainImage' => true,
+            ],
+        ],
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    // The flagged entry, not the first one — position is not the rule.
+    $article = Article::query()->firstOrFail();
+
+    expect($article->main_image_id)->toBe(2052097)
+        ->and($article->main_image_filename)->toBe('header.jpeg');
+});
+
+it('leaves the main image columns null on an article with no images', function () {
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id'            => 20001,
+        'articleNumber' => 'ART-001',
+        'articleImages' => [],
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    $article = Article::query()->firstOrFail();
+
+    expect($article->main_image_id)->toBeNull()
+        ->and($article->main_image_filename)->toBeNull();
+});
+
+it('leaves the main image columns null when every image is unflagged', function () {
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id'            => 20001,
+        'articleImages' => [[
+            'id'        => 1965,
+            'fileName'  => 'streetlight-1388418_1920.jpg',
+            'mainImage' => false,
+        ]],
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    expect(Article::query()->firstOrFail()->main_image_id)->toBeNull();
+});
+
+it('clears a stale main image when Weclapp no longer has one', function () {
+    // The gap page reads these columns to decide whether Weclapp holds an image.
+    // Keeping the old value would make it claim an image that has been deleted.
+    Article::factory()->withMainImage()->create(['weclapp_id' => 20001]);
+
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id'            => 20001,
+        'articleImages' => [],
+    ]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    $article = Article::query()->firstOrFail();
+
+    expect($article->main_image_id)->toBeNull()
+        ->and($article->main_image_filename)->toBeNull();
+});
+
+it('mirrors both text fields Weclapp holds for only some articles', function () {
+    Http::fake(['*article*' => Http::response(['result' => [
+        [
+            'id'                => 20001,
+            'shortDescription1' => 'Kurzbeschreibung',
+            'longText'          => '<p>Langtext</p>',
+        ],
+        [
+            'id' => 20002,
+        ],
+    ]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    $withText = Article::query()->where('weclapp_id', 20001)->firstOrFail();
+    $without = Article::query()->where('weclapp_id', 20002)->firstOrFail();
+
+    expect($withText->short_description_1)->toBe('Kurzbeschreibung')
+        ->and($withText->long_text)->toBe('<p>Langtext</p>')
+        ->and($without->short_description_1)->toBeNull()
+        ->and($without->long_text)->toBeNull();
+});
+
 it('fails on an unknown entity', function () {
     $this->artisan('weclapp:sync nope')
         ->expectsOutputToContain('Unknown entity "nope"')

@@ -86,6 +86,13 @@ final class SyncRegistry
                 ],
                 reconciles: true,
             ),
+            // articleImages is a nested collection and the rest of them are skipped,
+            // but the main image is flattened for the same reason reductionAdditions
+            // is: a consumer has to be able to answer "does Weclapp have an image for
+            // this article?" across many articles at once, and without these two
+            // columns that question costs one API call per article. A live full read
+            // found articleImages on 3 of 748 articles, so the answer is almost
+            // always no — which is exactly why it has to be cheap to ask.
             'articles' => new SyncDefinition(
                 endpoint: 'article',
                 model: Article::class,
@@ -94,11 +101,23 @@ final class SyncRegistry
                     'article_category_id' => 'articleCategoryId',
                     'article_number'      => 'articleNumber',
                     'description'         => 'description',
+                    // The second HTML text field. Mirrored because it is the Weclapp
+                    // counterpart of a local field a consumer may want to push up, so
+                    // the comparison has to be answerable without an API call.
+                    'long_text'           => 'longText',
                     'name'                => 'name',
+                    'short_description_1' => 'shortDescription1',
                     'unit_id'             => 'unitId',
                     'weclapp_id'          => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
+                // Values are passed through raw, as the scalar maps do, and left to
+                // the model casts to convert: Weclapp sends ids as strings, the
+                // mirror stores them as integers.
+                derive: [
+                    'main_image_id'       => fn (object $record): mixed => self::mainImageField($record, 'id'),
+                    'main_image_filename' => fn (object $record): mixed => self::mainImageField($record, 'fileName'),
+                ],
                 reconciles: true,
             ),
             'users' => new SyncDefinition(
@@ -240,5 +259,30 @@ final class SyncRegistry
                 reconciles: true,
             ),
         ];
+    }
+
+    /**
+     * One field of the articleImages entry Weclapp flags as the main image, or
+     * null when the article has no flagged image.
+     *
+     * Selected by the flag rather than by position: Weclapp documents no ordering
+     * for the collection, so `articleImages.0` would be right by luck rather than
+     * by rule.
+     */
+    private static function mainImageField(object $record, string $field): mixed
+    {
+        $images = data_get($record, 'articleImages');
+
+        if (! is_iterable($images)) {
+            return null;
+        }
+
+        foreach ($images as $image) {
+            if (data_get($image, 'mainImage') === true) {
+                return data_get($image, $field);
+            }
+        }
+
+        return null;
     }
 }

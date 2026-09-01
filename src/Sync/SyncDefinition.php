@@ -9,6 +9,13 @@ use Illuminate\Support\Carbon;
 
 /**
  * Declarative mapping from a Weclapp collection endpoint onto a mirror model.
+ *
+ * `$derive` is the one escape hatch from the declarative maps. `$paths` can only
+ * address a nested entry by position, so picking the single flagged entry out of a
+ * collection — the articleImages row with `mainImage` true — needs real code. It
+ * takes plain closures rather than a matcher mini-language, so there is nothing to
+ * learn beyond PHP; the trade is that a definition carrying one cannot be
+ * serialised, which is fine while SyncRegistry builds them all in-process.
  */
 final readonly class SyncDefinition
 {
@@ -18,6 +25,8 @@ final readonly class SyncDefinition
      * @param array<string, string> $dates column => API field (epoch-ms datetime)
      * @param array<string, string> $paths column => dot-path to a scalar nested inside
      *                                     the record, e.g. `reductionAdditions.0.value`
+     * @param array<string, callable(object): mixed> $derive column => callback, for values no
+     *                                                       dot-path can address; see the note below
      * @param array<string, mixed> $defaults column => static value applied to every record
      * @param array<string, mixed> $filters query filters narrowing a shared resource to this entity
      * @param string $key The mirror column used to match existing rows (its API field must be in $map)
@@ -32,6 +41,7 @@ final readonly class SyncDefinition
         public array $map,
         public array $dates = [],
         public array $paths = [],
+        public array $derive = [],
         public array $defaults = [],
         public array $filters = [],
         public string $key = 'weclapp_id',
@@ -68,6 +78,16 @@ final readonly class SyncDefinition
             if ($value !== null) {
                 $attributes[$column] = $value;
             }
+        }
+
+        // Unlike the maps above, a derived null is written through rather than
+        // skipped. The others skip because Weclapp omits null fields from JSON
+        // entirely, so an absent key says nothing about the value. A closure runs
+        // against the whole record and answers definitively, so its null means
+        // "there is none" — and keeping the previous value instead would leave a
+        // mirror claiming Weclapp still has an image it no longer has.
+        foreach ($this->derive as $column => $callback) {
+            $attributes[$column] = $callback($record);
         }
 
         return [...$attributes, ...$this->defaults];
