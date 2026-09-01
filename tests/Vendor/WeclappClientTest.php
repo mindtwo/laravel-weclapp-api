@@ -107,3 +107,74 @@ it('throws when a download is refused rather than reporting no document', functi
 
     app(Client::class)->download('article/id/1964/downloadMainArticleImage');
 })->throws(RequestException::class);
+
+it('appends the dryRun flag to a put when requested', function () {
+    Http::fake(['*' => Http::response(['id' => '1964'], 200)]);
+
+    WeclappClient::put('article', 1964, ['name' => 'Widget'], dryRun: true);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'article/id/1964?dryRun=true')
+        && $request->method() === 'PUT'
+        && $request['name'] === 'Widget');
+});
+
+it('does not append the dryRun flag to a put by default', function () {
+    Http::fake(['*' => Http::response([], 200)]);
+
+    WeclappClient::put('article', 1964, []);
+
+    Http::assertSent(fn ($request) => ! str_contains($request->url(), 'dryRun')
+        && str_ends_with($request->url(), '/article/id/1964'));
+});
+
+it('suppresses a dry-run put too, since it still leaves the environment', function () {
+    config()->set('weclapp-api.writes_enabled', false);
+    Http::fake();
+
+    expect(WeclappClient::put('article', 1964, ['name' => 'Widget'], dryRun: true))->toBe([]);
+
+    Http::assertNothingSent();
+});
+
+it('uploads bytes as a raw body with the filename in the query, not multipart', function () {
+    Http::fake(['*uploadArticleImage*' => Http::response(['result' => ['id' => '2052097']], 200)]);
+
+    $result = app(Client::class)->upload(
+        'article/id/1964/uploadArticleImage',
+        'binary-jpeg-bytes',
+        'header.jpeg',
+        'image/jpeg',
+        ['mainImage' => 'true'],
+    );
+
+    expect($result)->toBe(['result' => ['id' => '2052097']]);
+
+    Http::assertSent(function ($request) {
+        return $request->method() === 'POST'
+            && $request->body() === 'binary-jpeg-bytes'
+            && $request->hasHeader('Content-Type', 'image/jpeg')
+            && str_contains($request->url(), 'name=header.jpeg')
+            && str_contains($request->url(), 'mainImage=true');
+    });
+});
+
+it('returns null when uploading against a record that does not exist', function () {
+    Http::fake(['*uploadArticleImage*' => Http::response('', 404)]);
+
+    expect(app(Client::class)->upload('article/id/999/uploadArticleImage', 'bytes', 'a.jpg'))->toBeNull();
+});
+
+it('throws when an upload is refused rather than reporting no record', function () {
+    Http::fake(['*uploadArticleImage*' => Http::response('', 403)]);
+
+    app(Client::class)->upload('article/id/1964/uploadArticleImage', 'bytes', 'a.jpg');
+})->throws(RequestException::class);
+
+it('suppresses an upload when writes are disabled', function () {
+    config()->set('weclapp-api.writes_enabled', false);
+    Http::fake();
+
+    expect(app(Client::class)->upload('article/id/1964/uploadArticleImage', 'bytes', 'a.jpg'))->toBe([]);
+
+    Http::assertNothingSent();
+});
