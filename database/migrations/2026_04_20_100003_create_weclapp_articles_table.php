@@ -13,13 +13,20 @@ return new class extends Migration
         Schema::create('weclapp_articles', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('article_category_id')->nullable();
+            // Flattened from the nested articleImages collection: the entry flagged
+            // mainImage. Present so a consumer can ask whether Weclapp holds an image
+            // for many articles at once without an API call per article.
+            $table->unsignedBigInteger('main_image_id')->nullable();
             $table->unsignedBigInteger('unit_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
             $table->boolean('active')->default(true);
             $table->string('article_number')->nullable();
             $table->text('description')->nullable();
             $table->datetime('last_modified')->nullable();
-            $table->string('name')->nullable();
+            $table->text('long_text')->nullable();
+            $table->string('main_image_filename', 1000)->nullable();
+            $table->string('name', 300)->nullable();
+            $table->text('short_description_1')->nullable();
             $table->timestamps();
             // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
             $table->softDeletes();
