@@ -156,6 +156,71 @@ WeclappClient::customers()->query(['company-eq' => 'ACME GmbH']);
 // GET /party?customer-eq=true&company-eq=ACME+GmbH
 ```
 
+### What the spec does not tell you about writes
+
+The OpenAPI spec describes shape, not behaviour. Everything below was established
+against a live tenant and costs real time to rediscover, so it is recorded here.
+
+**Weclapp omits null fields from JSON entirely.** An absent key is indistinguishable
+from a field that does not exist, which is why a sampled response is never evidence
+that a field is unsupported — and why the trap below exists at all.
+
+**A single-record GET is not envelope-wrapped.** Collections answer
+`{"result": [...]}`; `GET /{resource}/id/{id}` returns the record itself.
+`find()` accounts for this, `get()` unwraps the envelope.
+
+**PUT is a full replace, and omitting a field counts as changing it.** This turns a
+seemingly harmless partial update into a permission error:
+
+```php
+// 403 — the payload omits articleType, which reads as changing it
+WeclappClient::put('article', $id, ['shortDescription1' => 'x']);
+
+// The only shape that works: re-read, merge, send the whole record back
+$record = (array) WeclappClient::find('article', $id);
+WeclappClient::put('article', $id, [...$record, 'shortDescription1' => 'x']);
+```
+
+**Refusals are field-level and come in two flavours**, neither of which is a plain
+403 on the endpoint:
+
+| Response | Meaning |
+| --- | --- |
+| `403 missing permissions for {field}` | the role may not write that field |
+| `400 no authorization to access property or referenced entity` | same thing, different field |
+| `400 validation failed` + `validationErrors[]` | a real content problem; read `location` and `detail` |
+
+**A field can be required on write yet absent on read.** That combination makes a
+record unwritable through the API, and it is not hypothetical: `article` demands
+`primarySupplySourceId` as soon as `supplySources` is non-empty, but never returns
+that field — so a faithful read-modify-write cannot satisfy it, supplying a derived
+value is refused separately, and dropping the collection is refused too. On one
+tenant that was 455 of 758 articles. Check for it before offering a write.
+
+**Nested collections do not share one rule.** On `article`, `articleImages` may be
+emptied but `articlePrices` may not — removing a price is a delete, and a separate
+permission. Test each collection rather than generalising from one.
+
+**Some resources are GET-only at the HTTP level.** `articlePrice` answers `405` to
+both `POST` and `DELETE`; prices exist only as a nested collection on the article,
+which means they can be **created and edited but never removed** through the API.
+A wrongly created price can only be deleted in the Weclapp UI — worth knowing before
+writing one.
+
+**Duplicate detection is content-level.** A second list price with the same scale and
+sales channel is `400 validation failed`, not a permission problem. The same payload
+on a free scale, or scoped to a customer, is accepted.
+
+**`dryRun` genuinely does not persist** — verified by comparing the record byte-for-byte
+before and after — but it is **not available everywhere**. It exists on `PUT`/`DELETE`
+for `article` and `party`; `uploadArticleImage` has no dry run at all, so an image
+write cannot be validated before it happens.
+
+**`/system/permissions` is not a reliable account of what a token may do.** It returns
+the catalogue of right names and disagrees with observed behaviour in both directions —
+on one tenant it claimed read access to resources that answered `403`, and omitted one
+that worked. Probe the operation you care about instead of reading the list.
+
 ### Writes and the lazy response proxy
 
 `create()`, `update()` and `delete()` return a `LazyResponseProxy`. It behaves
@@ -203,6 +268,35 @@ that path yourself, e.g. for a nested action:
 ```php
 WeclappClient::post(WeclappClient::recordPath('salesOrder', 42).'/createCustomerReturn', []);
 ```
+
+Binary sub-paths get their own two methods, because Weclapp handles files with
+neither JSON nor multipart:
+
+```php
+// GET a binary; null on 404 so "there is no image" is not an exception
+$response = WeclappClient::download("article/id/{$id}/downloadMainArticleImage");
+
+// POST a binary. The bytes are the raw request body and the filename is a
+// required `name` query parameter — it is NOT multipart/form-data.
+WeclappClient::upload(
+    "article/id/{$id}/uploadArticleImage",
+    $bytes,
+    'photo.jpg',
+    'image/jpeg',
+    ['mainImage' => 'true'],
+);
+```
+
+`put()` also takes a `dryRun` flag, which asks Weclapp to validate the payload
+without persisting it:
+
+```php
+WeclappClient::put('article', $id, $payload, dryRun: true);
+```
+
+Note that write suppression covers a dry run too — it is still a PUT against the
+live tenant — so check `writesSuppressed()` rather than reading meaning into the
+empty array it returns.
 
 ### Write suppression
 
