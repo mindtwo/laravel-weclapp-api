@@ -160,5 +160,9 @@ Thumbs.db
 .env
 .context
 /package.xml
-build/phpstan
+# All generated build output: phpstan cache, coverage reports, junit logs.
+# Broader than the old `build/phpstan` so a coverage run stops staging itself.
+# Root-anchored on purpose: a bare `build` would also swallow `public/build` and any
+# nested build directory, which is more than intended.
+/build
 report.junit.xml
