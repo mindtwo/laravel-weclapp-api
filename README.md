@@ -190,22 +190,30 @@ WeclappClient::put('article', $id, [...$record, 'shortDescription1' => 'x']);
 | `400 no authorization to access property or referenced entity` | same thing, different field |
 | `400 validation failed` + `validationErrors[]` | a real content problem; read `location` and `detail` |
 
-**A field can be required on write yet absent on read.** That combination makes a
-record unwritable through the API, and it is not hypothetical: `article` demands
-`primarySupplySourceId` as soon as `supplySources` is non-empty, but never returns
-that field — so a faithful read-modify-write cannot satisfy it, supplying a derived
-value is refused separately, and dropping the collection is refused too. On one
-tenant that was 455 of 758 articles. Check for it before offering a write.
+**A field can be required on write yet absent on read — and the absence may be a
+permission, not a null.** `article` demands `primarySupplySourceId` as soon as
+`supplySources` is non-empty. On one tenant that field was missing from **every** one
+of 758 articles, which made 455 of them unwritable: read-modify-write could not satisfy
+the validation, supplying a derived value was refused separately, and dropping the
+collection was refused too.
+
+It turned out Weclapp was **hiding** the field because the token lacked read access to
+the `articleSupplySource` entity. Granting that access made the field appear on all 455
+and every article writable. So an absent field can mean "null", "not supported", *or*
+"you may not see this" — and only the third is fixable by asking. When a required field
+is missing, check whether its referenced entity is readable before concluding the record
+cannot be written.
 
 **Nested collections do not share one rule.** On `article`, `articleImages` may be
 emptied but `articlePrices` may not — removing a price is a delete, and a separate
 permission. Test each collection rather than generalising from one.
 
 **Some resources are GET-only at the HTTP level.** `articlePrice` answers `405` to
-both `POST` and `DELETE`; prices exist only as a nested collection on the article,
-which means they can be **created and edited but never removed** through the API.
-A wrongly created price can only be deleted in the Weclapp UI — worth knowing before
-writing one.
+both `POST` and `DELETE`; prices exist only as a nested collection on the article, so
+every price write goes through `PUT /article`. Whether you may *remove* one is a
+separate permission from creating it — on one tenant deletion was refused while creation
+was allowed, which made a wrongly created price removable only in the Weclapp UI. Do not
+assume that being able to add implies being able to undo.
 
 **Duplicate detection is content-level.** A second list price with the same scale and
 sales channel is `400 validation failed`, not a permission problem. The same payload
