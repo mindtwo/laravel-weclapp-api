@@ -281,6 +281,34 @@ it('counts the supplySources collection, which decides whether the article is wr
         ->and(Article::query()->where('weclapp_id', 20003)->firstOrFail()->supply_source_count)->toBe(0);
 });
 
+it('mirrors primarySupplySourceId, whose absence is what blocks a write', function () {
+    // Weclapp hides the field from reads when the token lacks articleSupplySource
+    // access, and demands it on write once a supplySource exists. A null here beside a
+    // non-zero count is therefore the precise "cannot be written" signal.
+    Http::fake(['*article*' => Http::response(['result' => [
+        [
+            'id'                    => 20001,
+            'primarySupplySourceId' => 7496304,
+            'supplySources'         => [['id' => 1, 'articleSupplySourceId' => 7496304, 'positionNumber' => 1]],
+        ],
+        [
+            'id'            => 20002,
+            'supplySources' => [['id' => 2, 'articleSupplySourceId' => 9002, 'positionNumber' => 1]],
+        ],
+    ]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    $writable = Article::query()->where('weclapp_id', 20001)->firstOrFail();
+    $blocked = Article::query()->where('weclapp_id', 20002)->firstOrFail();
+
+    expect($writable->primary_supply_source_id)->toBe(7496304)
+        ->and($writable->supply_source_count)->toBe(1)
+        // Weclapp withheld the field, so the mirror records that as null.
+        ->and($blocked->primary_supply_source_id)->toBeNull()
+        ->and($blocked->supply_source_count)->toBe(1);
+});
+
 it('fails on an unknown entity', function () {
     $this->artisan('weclapp:sync nope')
         ->expectsOutputToContain('Unknown entity "nope"')
