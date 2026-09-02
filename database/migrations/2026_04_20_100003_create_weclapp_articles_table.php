@@ -17,6 +17,13 @@ return new class extends Migration
             // mainImage. Present so a consumer can ask whether Weclapp holds an image
             // for many articles at once without an API call per article.
             $table->unsignedBigInteger('main_image_id')->nullable();
+            // The supplySources entry Weclapp treats as primary. Mirrored because its
+            // absence is what makes an article unwritable: Weclapp demands the field once
+            // a supplySource exists, and hides it from reads when the token lacks
+            // articleSupplySource access. A null here alongside a non-zero
+            // supply_source_count is therefore the precise "cannot be written" signal —
+            // and it re-appears by itself if that permission is ever withdrawn again.
+            $table->unsignedBigInteger('primary_supply_source_id')->nullable();
             $table->unsignedBigInteger('unit_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
             $table->boolean('active')->default(true);

@@ -26,14 +26,15 @@ class ArticleFactory extends Factory
             // almost every real article looks like: a live full read found an image
             // on 3 of 748 and a shortDescription1 on 40. Use withMainImage() when a
             // test needs the rarer shape.
-            'long_text'           => null,
-            'main_image_filename' => null,
-            'main_image_id'       => null,
-            'name'                => $this->faker->words(3, true),
-            'short_description_1' => null,
-            'supply_source_count' => 0,
-            'unit_id'             => $this->faker->numberBetween(1, 10),
-            'weclapp_id'          => $this->faker->unique()->numberBetween(10000, 99999),
+            'long_text'                => null,
+            'main_image_filename'      => null,
+            'main_image_id'            => null,
+            'name'                     => $this->faker->words(3, true),
+            'primary_supply_source_id' => null,
+            'short_description_1'      => null,
+            'supply_source_count'      => 0,
+            'unit_id'                  => $this->faker->numberBetween(1, 10),
+            'weclapp_id'               => $this->faker->unique()->numberBetween(10000, 99999),
         ];
     }
 

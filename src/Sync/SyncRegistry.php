@@ -104,11 +104,12 @@ final class SyncRegistry
                     // The second HTML text field. Mirrored because it is the Weclapp
                     // counterpart of a local field a consumer may want to push up, so
                     // the comparison has to be answerable without an API call.
-                    'long_text'           => 'longText',
-                    'name'                => 'name',
-                    'short_description_1' => 'shortDescription1',
-                    'unit_id'             => 'unitId',
-                    'weclapp_id'          => 'id',
+                    'long_text'                => 'longText',
+                    'name'                     => 'name',
+                    'primary_supply_source_id' => 'primarySupplySourceId',
+                    'short_description_1'      => 'shortDescription1',
+                    'unit_id'                  => 'unitId',
+                    'weclapp_id'               => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
                 // Values are passed through raw, as the scalar maps do, and left to
