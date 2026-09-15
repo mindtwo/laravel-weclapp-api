@@ -34,8 +34,19 @@ class ArticleFactory extends Factory
             'short_description_1'      => null,
             'supply_source_count'      => 0,
             'unit_id'                  => $this->faker->numberBetween(1, 10),
-            'weclapp_id'               => $this->faker->unique()->numberBetween(10000, 99999),
+            // Tagged by default, unlike the fields above, because this one is read as
+            // a filter rather than as data: a consumer's candidate lists hide
+            // untagged articles, so an untagged default would make every test build
+            // an article its own page then refuses to show. Use untagged() for the
+            // other side of that filter.
+            'visible'    => true,
+            'weclapp_id' => $this->faker->unique()->numberBetween(10000, 99999),
         ];
+    }
+
+    public function untagged(): static
+    {
+        return $this->state(fn (): array => ['visible' => false]);
     }
 
     public function withMainImage(): static

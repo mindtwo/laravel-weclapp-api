@@ -309,6 +309,46 @@ it('mirrors primarySupplySourceId, whose absence is what blocks a write', functi
         ->and($blocked->supply_source_count)->toBe(1);
 });
 
+it('flags the Cloud tag as visible, and keeps mirroring the articles without it', function () {
+    // The tag decides whether a consumer may offer the article at all, so it has to be
+    // answerable from the mirror. Untagged articles are still mirrored: filtering the
+    // sync would archive rows other tables reference by weclapp_id.
+    Http::fake(['*article*' => Http::response(['result' => [
+        ['id' => 20001, 'tags' => ['Cloud']],
+        ['id' => 20002, 'tags' => ['clo']],
+        ['id' => 20003, 'tags' => []],
+        ['id' => 20004],
+    ]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    expect(Article::query()->where('weclapp_id', 20001)->firstOrFail()->visible)->toBeTrue()
+        // A mistyped tag reads as absent rather than as a near-match, so it surfaces
+        // as a missing article somebody notices.
+        ->and(Article::query()->where('weclapp_id', 20002)->firstOrFail()->visible)->toBeFalse()
+        ->and(Article::query()->where('weclapp_id', 20003)->firstOrFail()->visible)->toBeFalse()
+        // Weclapp omits empty collections entirely; that is not the same as unknown.
+        ->and(Article::query()->where('weclapp_id', 20004)->firstOrFail()->visible)->toBeFalse()
+        ->and(Article::query()->count())->toBe(4);
+});
+
+it('flips visible off when the tag is removed, without losing the mirror row', function () {
+    Http::fake(['*article*' => Http::sequence()
+        ->push(['result' => [['id' => 20001, 'article_number' => 'A-1', 'tags' => ['Cloud']]]], 200)
+        ->push(['result' => [['id' => 20001, 'article_number' => 'A-1', 'tags' => []]]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    $id = Article::query()->where('weclapp_id', 20001)->firstOrFail()->id;
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    $article = Article::query()->withTrashed()->findOrFail($id);
+
+    expect($article->visible)->toBeFalse()
+        ->and($article->trashed())->toBeFalse();
+});
+
 it('fails on an unknown entity', function () {
     $this->artisan('weclapp:sync nope')
         ->expectsOutputToContain('Unknown entity "nope"')

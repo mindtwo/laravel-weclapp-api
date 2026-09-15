@@ -40,6 +40,18 @@ return new class extends Migration
             // written at all — Weclapp requires primarySupplySourceId once a
             // supplySource exists, and does not return that field on a read.
             $table->unsignedInteger('supply_source_count')->default(0);
+            // Derived from the `tags` collection: does the article carry the `Cloud`
+            // tag? Not to be confused with `active` above, which mirrors Weclapp's own
+            // `active` field — whether the article is in use in the ERP at all.
+            // `visible` is the other axis: whether the article belongs in the
+            // consuming Cloud application. An article can be active and not visible,
+            // or visible and inactive; the two never imply each other.
+            //
+            // Defaults to false so a mirror predating this column reads as "not
+            // tagged" rather than as "everything is in the Cloud", which is the
+            // conservative direction — a consumer offering too few articles is a
+            // visible gap, one offering too many is a silent leak.
+            $table->boolean('visible')->default(false)->index();
             $table->timestamps();
             // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
             $table->softDeletes();
