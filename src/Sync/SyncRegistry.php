@@ -93,6 +93,15 @@ final class SyncRegistry
             // columns that question costs one API call per article. A live full read
             // found articleImages on 3 of 748 articles, so the answer is almost
             // always no — which is exactly why it has to be cheap to ask.
+            //
+            // `tags` is flattened for the opposite reason: it is dense. Auprion tags
+            // the articles that belong in their Cloud application with `Cloud` — 320
+            // of 758 carry it, and no article carries any other tag — so the mirror
+            // keeps the answer as a boolean rather than the collection. Every article
+            // is still mirrored, tagged or not: filtering the *sync* would soft-delete
+            // a row the moment somebody untagged an article in Weclapp, and other
+            // tables reference these rows by `weclapp_id`. Consumers filter at the
+            // point where an article is offered, not at the point where it is stored.
             'articles' => new SyncDefinition(
                 endpoint: 'article',
                 model: Article::class,
@@ -119,6 +128,7 @@ final class SyncRegistry
                     'main_image_id'       => fn (object $record): mixed => self::mainImageField($record, 'id'),
                     'main_image_filename' => fn (object $record): mixed => self::mainImageField($record, 'fileName'),
                     'supply_source_count' => fn (object $record): mixed => self::countOf($record, 'supplySources'),
+                    'visible'             => fn (object $record): mixed => self::hasTag($record, 'Cloud'),
                 ],
                 reconciles: true,
             ),
@@ -275,6 +285,21 @@ final class SyncRegistry
         $value = data_get($record, $collection);
 
         return is_countable($value) ? count($value) : 0;
+    }
+
+    /**
+     * Whether the record's `tags` collection carries a given tag.
+     *
+     * Weclapp's `tags` is a free-text `array<string>` with no controlled
+     * vocabulary, which is why this is a flat, case-sensitive membership test
+     * rather than anything fuzzier: a mistyped tag has to read as absent, so it
+     * shows up as a gap somebody notices instead of being silently forgiven.
+     */
+    private static function hasTag(object $record, string $tag): bool
+    {
+        $tags = data_get($record, 'tags');
+
+        return is_iterable($tags) && in_array($tag, is_array($tags) ? $tags : iterator_to_array($tags), true);
     }
 
     /**

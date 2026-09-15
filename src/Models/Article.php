@@ -26,6 +26,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleFactory;
  * @property string|null $main_image_filename
  * @property string|null $name
  * @property string|null $short_description_1
+ * @property bool $visible
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $deleted_at
@@ -52,6 +53,7 @@ class Article extends Model
         'short_description_1',
         'supply_source_count',
         'unit_id',
+        'visible',
         'weclapp_id',
     ];
 
@@ -81,6 +83,7 @@ class Article extends Model
             'primary_supply_source_id' => 'integer',
             'supply_source_count'      => 'integer',
             'unit_id'                  => 'integer',
+            'visible'                  => 'boolean',
             'weclapp_id'               => 'integer',
         ];
     }
