@@ -99,24 +99,24 @@ function fail(string ...$messages): never
 function options(): array
 {
     return [
-        'author-name' => ['type' => 'string', 'group' => 'Author', 'label' => 'Author name', 'default' => 'git config user.name'],
-        'author-email' => ['type' => 'string', 'group' => 'Author', 'label' => 'Author email', 'default' => 'git config user.email'],
-        'author-username' => ['type' => 'string', 'group' => 'Author', 'label' => 'Author username', 'default' => 'guessed from git/gh'],
-        'vendor-name' => ['type' => 'string', 'group' => 'Vendor', 'label' => 'Vendor name', 'default' => 'guessed from the git remote', 'required' => true],
-        'vendor-username' => ['type' => 'string', 'group' => 'Vendor', 'label' => 'Vendor username', 'hint' => 'The slug used in composer.json, e.g. "spatie" in spatie/laravel-ray.', 'default' => 'slug of the vendor name'],
-        'vendor-namespace' => ['type' => 'string', 'group' => 'Vendor', 'label' => 'Vendor namespace', 'hint' => 'The PHP namespace prefix for your package, e.g. Spatie\\LaravelRay.', 'default' => 'studly vendor name'],
-        'package-name' => ['type' => 'string', 'group' => 'Package', 'label' => 'Package name', 'default' => 'the current directory name', 'required' => true],
-        'class-name' => ['type' => 'string', 'group' => 'Package', 'label' => 'Class name', 'default' => 'studly package name'],
-        'description' => ['type' => 'string', 'group' => 'Package', 'label' => 'Package description', 'default' => '"This is my package <slug>"'],
-        'phpstan' => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Enable PhpStan?', 'hint' => 'Static analysis to catch bugs before they reach production.', 'default' => true],
-        'pint' => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Enable Laravel Pint?', 'hint' => 'Automatic code formatting following Laravel conventions.', 'default' => true],
-        'dependabot' => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Enable Dependabot?', 'hint' => 'Automated dependency update PRs via GitHub.', 'default' => true],
-        'ray' => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Use Ray for debugging?', 'hint' => 'Debug your package with the Ray desktop app.', 'default' => true],
+        'author-name'        => ['type' => 'string', 'group' => 'Author', 'label' => 'Author name', 'default' => 'git config user.name'],
+        'author-email'       => ['type' => 'string', 'group' => 'Author', 'label' => 'Author email', 'default' => 'git config user.email'],
+        'author-username'    => ['type' => 'string', 'group' => 'Author', 'label' => 'Author username', 'default' => 'guessed from git/gh'],
+        'vendor-name'        => ['type' => 'string', 'group' => 'Vendor', 'label' => 'Vendor name', 'default' => 'guessed from the git remote', 'required' => true],
+        'vendor-username'    => ['type' => 'string', 'group' => 'Vendor', 'label' => 'Vendor username', 'hint' => 'The slug used in composer.json, e.g. "spatie" in spatie/laravel-ray.', 'default' => 'slug of the vendor name'],
+        'vendor-namespace'   => ['type' => 'string', 'group' => 'Vendor', 'label' => 'Vendor namespace', 'hint' => 'The PHP namespace prefix for your package, e.g. Spatie\\LaravelRay.', 'default' => 'studly vendor name'],
+        'package-name'       => ['type' => 'string', 'group' => 'Package', 'label' => 'Package name', 'default' => 'the current directory name', 'required' => true],
+        'class-name'         => ['type' => 'string', 'group' => 'Package', 'label' => 'Class name', 'default' => 'studly package name'],
+        'description'        => ['type' => 'string', 'group' => 'Package', 'label' => 'Package description', 'default' => '"This is my package <slug>"'],
+        'phpstan'            => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Enable PhpStan?', 'hint' => 'Static analysis to catch bugs before they reach production.', 'default' => true],
+        'pint'               => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Enable Laravel Pint?', 'hint' => 'Automatic code formatting following Laravel conventions.', 'default' => true],
+        'dependabot'         => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Enable Dependabot?', 'hint' => 'Automated dependency update PRs via GitHub.', 'default' => true],
+        'ray'                => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Use Ray for debugging?', 'hint' => 'Debug your package with the Ray desktop app.', 'default' => true],
         'changelog-workflow' => ['type' => 'bool', 'group' => 'Tooling', 'label' => 'Use automatic changelog updater workflow?', 'hint' => 'Automatically updates CHANGELOG.md when a new release is tagged.', 'default' => true],
-        'run-tests' => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Execute `composer install` and run tests?', 'default' => 'yes when interactive, no otherwise'],
-        'delete-script' => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Let this script delete itself?', 'default' => true],
-        'no-interaction' => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Never prompt; use flags and derived defaults only.', 'default' => false, 'short' => 'n'],
-        'help' => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Show this help and exit.', 'default' => false, 'short' => 'h'],
+        'run-tests'          => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Execute `composer install` and run tests?', 'default' => 'yes when interactive, no otherwise'],
+        'delete-script'      => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Let this script delete itself?', 'default' => true],
+        'no-interaction'     => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Never prompt; use flags and derived defaults only.', 'default' => false, 'short' => 'n'],
+        'help'               => ['type' => 'bool', 'group' => 'Behaviour', 'label' => 'Show this help and exit.', 'default' => false, 'short' => 'h'],
     ];
 }
 
@@ -473,9 +473,9 @@ function guessGitHubVendorInfo($authorName, $username): array
 $given = parseArgs($argv);
 
 $state = [
-    'given' => $given,
-    'interactive' => ! ($given['no-interaction'] ?? false),
-    'missing' => [],
+    'given'          => $given,
+    'interactive'    => ! ($given['no-interaction'] ?? false),
+    'missing'        => [],
     'firstInSection' => true,
 ];
 
