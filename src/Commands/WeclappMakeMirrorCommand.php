@@ -21,7 +21,12 @@ class WeclappMakeMirrorCommand extends Command
 
     public function handle(): int
     {
-        $resource = (string) $this->argument('resource');
+        // `argument()` is typed array|bool|string|null because the console component
+        // cannot know an argument is single-valued. Anything but a string is not a
+        // resource name, and the unknown-resource branch below is already the right
+        // answer for it.
+        $resource = $this->argument('resource');
+        $resource = is_string($resource) ? $resource : '';
 
         if (! in_array($resource, SpecReader::resources(), true)) {
             $this->error("Unknown resource [{$resource}].");
@@ -75,7 +80,10 @@ class WeclappMakeMirrorCommand extends Command
 
     private function applyOnly(MirrorBlueprint $blueprint): MirrorBlueprint
     {
-        $only = (string) ($this->option('only') ?? '');
+        // As above: `--only` is declared single-valued, but the component's return type
+        // allows an array or a bool. Either means no usable field list was given.
+        $only = $this->option('only');
+        $only = is_string($only) ? $only : '';
 
         if ($only === '') {
             return $blueprint;
