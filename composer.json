@@ -72,8 +72,8 @@
             "pint"
         ],
         "test": "vendor/bin/pest --no-coverage --parallel",
-        "test-coverage": "vendor/bin/pest --coverage --parallel",
-        "test-type-coverage": "vendor/bin/pest --type-coverage --parallel",
+        "test-coverage": "@php -d memory_limit=512M vendor/bin/pest --coverage --parallel",
+        "test-type-coverage": "@php -d memory_limit=512M vendor/bin/pest --type-coverage --parallel",
         "test-profanity": "vendor/bin/pest --profanity --parallel",
         "format": "vendor/bin/pint",
         "post-autoload-dump": [
