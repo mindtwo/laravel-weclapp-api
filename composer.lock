@@ -9900,16 +9900,16 @@
         },
         {
             "name": "phpro/grumphp",
-            "version": "v2.24.0",
+            "version": "v2.25.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpro/grumphp.git",
-                "reference": "8abcadb4eb39a2c0124b9a220de12f8cf268e4c4"
+                "reference": "8af668884c838382e5114404204e62385ce3cdba"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpro/grumphp/zipball/8abcadb4eb39a2c0124b9a220de12f8cf268e4c4",
-                "reference": "8abcadb4eb39a2c0124b9a220de12f8cf268e4c4",
+                "url": "https://api.github.com/repos/phpro/grumphp/zipball/8af668884c838382e5114404204e62385ce3cdba",
+                "reference": "8af668884c838382e5114404204e62385ce3cdba",
                 "shasum": ""
             },
             "require": {
@@ -10015,9 +10015,9 @@
             "description": "A composer plugin that enables source code quality checks.",
             "support": {
                 "issues": "https://github.com/phpro/grumphp/issues",
-                "source": "https://github.com/phpro/grumphp/tree/v2.24.0"
+                "source": "https://github.com/phpro/grumphp/tree/v2.25.0"
             },
-            "time": "2026-09-25T08:41:10+00:00"
+            "time": "2026-10-03T08:58:23+00:00"
         },
         {
             "name": "phpstan/extension-installer",
@@ -12582,16 +12582,16 @@
         },
         {
             "name": "symfony/polyfill-deepclone",
-            "version": "v1.43.0",
+            "version": "v1.43.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-deepclone.git",
-                "reference": "8db92c5508a3f7f82d8688d32f0a4868a26e58ad"
+                "reference": "aaba44b6ee7299ae65717811c55b57ab9bc0fedd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-deepclone/zipball/8db92c5508a3f7f82d8688d32f0a4868a26e58ad",
-                "reference": "8db92c5508a3f7f82d8688d32f0a4868a26e58ad",
+                "url": "https://api.github.com/repos/symfony/polyfill-deepclone/zipball/aaba44b6ee7299ae65717811c55b57ab9bc0fedd",
+                "reference": "aaba44b6ee7299ae65717811c55b57ab9bc0fedd",
                 "shasum": ""
             },
             "require": {
@@ -12645,7 +12645,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-deepclone/tree/v1.43.0"
+                "source": "https://github.com/symfony/polyfill-deepclone/tree/v1.43.1"
             },
             "funding": [
                 {
@@ -12665,7 +12665,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-30T09:07:27+00:00"
+            "time": "2026-10-06T19:46:18+00:00"
         },
         {
             "name": "symfony/polyfill-php83",
