@@ -27,13 +27,13 @@
         "laravel/pint": "^v1.29",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^v8.9",
-        "orchestra/testbench": "^v11.1",
-        "pestphp/pest": "^v4.7",
-        "pestphp/pest-plugin-arch": "^v4.0",
-        "pestphp/pest-plugin-faker": "^v4.0",
-        "pestphp/pest-plugin-laravel": "^v4.1",
-        "pestphp/pest-plugin-profanity": "^v4.2",
-        "pestphp/pest-plugin-type-coverage": "^v4.0",
+        "orchestra/testbench": "^10.12 || ^11.1",
+        "pestphp/pest": "^4.7",
+        "pestphp/pest-plugin-arch": "^4.0",
+        "pestphp/pest-plugin-faker": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "pestphp/pest-plugin-profanity": "^4.0",
+        "pestphp/pest-plugin-type-coverage": "^4.0",
         "phpro/grumphp": "^v2.22",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-deprecation-rules": "^2.0",
@@ -57,8 +57,7 @@
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "npm install",
-            "npm run build"
+            "npm install"
         ],
         "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
@@ -68,13 +67,13 @@
             "@composer run build",
             "@php vendor/bin/testbench serve"
         ],
-        "analyse": "vendor/bin/phpstan analyse",
+        "analyse": "vendor/bin/phpstan analyse --memory-limit=512M",
         "lint": [
             "pint"
         ],
         "test": "vendor/bin/pest --no-coverage --parallel",
-        "test-coverage": "vendor/bin/pest --coverage --parallel",
-        "test-type-coverage": "vendor/bin/pest --type-coverage --parallel",
+        "test-coverage": "@php -d memory_limit=512M vendor/bin/pest --coverage --parallel",
+        "test-type-coverage": "@php -d memory_limit=512M vendor/bin/pest --type-coverage --parallel",
         "test-profanity": "vendor/bin/pest --profanity --parallel",
         "format": "vendor/bin/pint",
         "post-autoload-dump": [
@@ -98,6 +97,11 @@
             "pestphp/pest-plugin": true,
             "phpro/grumphp": true,
             "phpstan/extension-installer": true
+        },
+        "preferred-install": {
+            "orchestra/canvas": "source",
+            "orchestra/canvas-core": "source",
+            "*": "dist"
         }
     },
     "extra": {

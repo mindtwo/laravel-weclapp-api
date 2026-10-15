@@ -1,6 +1,134 @@
 <?php
 
-// config for mindtwo/laravel-clickup-api
-return [
+declare(strict_types=1);
 
+return [
+    /*
+    |--------------------------------------------------------------------------
+    | Weclapp Base URL
+    |--------------------------------------------------------------------------
+    |
+    | The fully-qualified base URL of your Weclapp instance's REST API,
+    | including the API version segment. A trailing slash is optional; the
+    | client normalises it. Example: https://your-tenant.weclapp.com/webapp/api/v2/
+    |
+    */
+
+    'base_url' => (string) env('MINDTWO_WECLAPP_URL', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Token
+    |--------------------------------------------------------------------------
+    |
+    | The Weclapp API token, sent on every request in the AuthenticationToken
+    | header. Create one per user under "My settings" in Weclapp.
+    |
+    */
+
+    'token' => (string) env('MINDTWO_WECLAPP_API_KEY', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination Page Size
+    |--------------------------------------------------------------------------
+    |
+    | Number of records requested per page when paginating a collection
+    | endpoint. Weclapp caps this at 1000.
+    |
+    */
+
+    'page_size' => (int) env('MINDTWO_WECLAPP_PAGE_SIZE', 1000),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Weclapp returns timestamps as epoch milliseconds. The sync commands
+    | convert them to datetimes in this timezone before persisting.
+    |
+    */
+
+    'timezone' => env('MINDTWO_WECLAPP_TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Write Requests Enabled
+    |--------------------------------------------------------------------------
+    |
+    | When false, mutating requests (POST/PUT/DELETE) are suppressed and logged
+    | instead of sent; reads still go through. Defaults to live everywhere
+    | except the local and testing environments. Override with
+    | MINDTWO_WECLAPP_WRITES_ENABLED.
+    |
+    */
+
+    'writes_enabled' => (bool) env(
+        'MINDTWO_WECLAPP_WRITES_ENABLED',
+        ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true),
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Visible Tag
+    |--------------------------------------------------------------------------
+    |
+    | The Weclapp article tag that marks an article as belonging in your
+    | application. The article mirror keeps it as the `visible` boolean. Leave
+    | empty to treat every article as visible.
+    |
+    */
+
+    'visible_tag' => env('MINDTWO_WECLAPP_VISIBLE_TAG'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP Client
+    |--------------------------------------------------------------------------
+    |
+    | Hard limits and retry policy applied to every outbound request so a hung
+    | connection can never block a worker or web request indefinitely. Timeouts
+    | are in seconds, retry sleep in milliseconds.
+    |
+    */
+
+    'http' => [
+        'timeout'         => (int) env('MINDTWO_WECLAPP_HTTP_TIMEOUT', 60),
+        'connect_timeout' => (int) env('MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT', 10),
+        'retry_times'     => (int) env('MINDTWO_WECLAPP_HTTP_RETRY_TIMES', 3),
+        'retry_sleep'     => (int) env('MINDTWO_WECLAPP_HTTP_RETRY_SLEEP', 500),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queued API Calls
+    |--------------------------------------------------------------------------
+    |
+    | Endpoint write methods return a LazyResponseProxy; calling ->getJob() on
+    | it hands back an undispatched WeclappApiCallJob you can queue. These
+    | settings control the connection that job runs on and the per-minute rate
+    | limit applied to it (Weclapp throttles aggressively).
+    |
+    */
+
+    'queue_connection'      => env('MINDTWO_WECLAPP_QUEUE_CONNECTION'),
+    'rate_limit_per_minute' => (int) env('MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE', 100),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Event Logging
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the package logs every WeclappApiCallCompleted event via the
+    | configured channel. Useful for auditing outbound traffic; off by default.
+    |
+    */
+
+    'logging' => [
+        'enabled'         => (bool) env('MINDTWO_WECLAPP_LOG_EVENTS', false),
+        'level'           => env('MINDTWO_WECLAPP_LOG_LEVEL', 'info'),
+        'channel'         => env('MINDTWO_WECLAPP_LOG_CHANNEL'),
+        'include_payload' => (bool) env('MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD', false),
+    ],
 ];
