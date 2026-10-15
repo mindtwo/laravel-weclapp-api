@@ -2,464 +2,385 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mindtwo/laravel-weclapp-api.svg?style=flat-square)](https://packagist.org/packages/mindtwo/laravel-weclapp-api)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/mindtwo/laravel-weclapp-api/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/mindtwo/laravel-weclapp-api/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/mindtwo/laravel-weclapp-api/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/mindtwo/laravel-weclapp-api/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/mindtwo/laravel-weclapp-api.svg?style=flat-square)](https://packagist.org/packages/mindtwo/laravel-weclapp-api)
 
-This Laravel package provides a convenient and efficient way to integrate your
-Laravel application with Weclapp, a cloud-based ERP and CRM platform. Designed
-for ease of use, it offers a seamless connection, enabling your Laravel
-application to interact
-with [Weclapp's REST API](https://www.weclapp.com/api/v2.html) to read and
-manage your business data. Whether you're looking to automate record updates,
-synchronize entities, or react to changes via webhooks, this package streamlines
-the process, making it easier to keep your Weclapp data in sync directly from
-your Laravel application.
+A thin, typed Laravel client for the [Weclapp REST API v2](https://www.weclapp.com/api/v2.html).
+It centralises authentication, pagination, retry and rate-limiting, exposes a
+fluent per-entity endpoint API, and can mirror selected Weclapp entities into
+local tables via ready-made sync commands.
 
-**Please note:** that this package currently supports a limited set of Weclapp
-endpoints, specifically those related to Tasks, Attachments, Custom Fields, and
-Webhooks.
-We are actively working to expand our coverage of Weclapp's API to include more
-endpoints and functionalities.
-If you require integration with aspects of Weclapp not yet covered by our
-package, we appreciate your patience and welcome contributions or suggestions to
-enhance our offering.
+Highlights:
+
+- A single configured HTTP client (`WeclappClient`) with the `AuthenticationToken`
+  header, automatic page-merging, timeouts and retry.
+- A typed endpoint class for **every** resource the Weclapp v2 API documents (152
+  of them), each with `query()` / `find()` / `count()` (reads) and
+  `create()` / `update()` / `delete()` (writes, where the API offers them).
+  The generic client still reaches anything else, including nested actions.
+- Writes return a lazy response proxy that runs synchronously **or** hands back an
+  undispatched, rate-limited queue job; every call emits a `WeclappApiCallCompleted`
+  event.
+- Publishable `weclapp_*` mirror models/migrations and `weclapp:sync` /
+  `weclapp:update` commands.
+- A `writes_enabled` toggle that suppresses (and logs) mutating requests in
+  local/testing without touching reads.
 
 ## Installation
-
-You can install the package via composer:
 
 ```bash
 composer require mindtwo/laravel-weclapp-api
 ```
 
-You can publish the config file with:
+Publish the config file:
 
 ```bash
 php artisan vendor:publish --tag="weclapp-api-config"
 ```
 
-This is the contents of the published [config file](config/weclapp-api.php).
+The mirror-table migrations are **publish-only** (they must not collide with a
+host app's own tables). Publish and run them only if you intend to use the mirror
+models / sync commands.
 
-You must publish and run the package migrations:
+**Pick the tables you actually read** — each entity has its own tag, so you are
+not forced to take all nine:
+
+```bash
+php artisan vendor:publish --tag="weclapp-api-migrations-article-prices"
+php artisan vendor:publish --tag="weclapp-api-migrations-articles"
+php artisan migrate
+```
+
+| Tag suffix | Table |
+| --- | --- |
+| `parties` | `weclapp_parties` (backs both `customers` and `suppliers`) |
+| `article-categories` | `weclapp_article_categories` |
+| `articles` | `weclapp_articles` |
+| `users` | `weclapp_users` |
+| `quotations` | `weclapp_quotations` |
+| `sales-orders` | `weclapp_sales_orders` |
+| `projects` | `weclapp_projects` |
+| `article-prices` | `weclapp_article_prices` |
+| `sales-invoices` | `weclapp_sales_invoices` |
+
+Or take everything at once:
 
 ```bash
 php artisan vendor:publish --tag="weclapp-api-migrations"
 php artisan migrate
 ```
 
-The migrations will create the necessary database tables for managing Weclapp webhooks, including:
-- `weclapp_webhooks` - Stores webhook registrations and health status
-- `weclapp_webhook_deliveries` - Tracks webhook delivery history
+Mirror tables have no foreign-key constraints between them — they correlate on
+`weclapp_id` — so publishing a subset is safe. The Eloquent relations (for
+example `ArticlePrice::article()`) simply return `null` if you did not publish
+the other side.
 
-## ENV Configuration
+## Configuration
 
-To ensure the proper functioning of this Laravel package with Weclapp, you must
-provide your Weclapp API token by setting the `MINDTWO_WECLAPP_API_KEY` variable
-in your application's environment configuration. Here's how to find your Weclapp
-API token:
-
-1. Log in to your Weclapp account and open your personal settings via the user
-   menu in the top-right corner.
-2. Navigate to the "API" (personal API token) section of your settings.
-3. Generate a new personal API token, or copy the existing one if you've already
-   created it.
-4. Copy the token and add it to your Laravel `.env` file as follows:
-   ```
-   MINDTWO_WECLAPP_API_KEY=your_weclapp_api_token_here
-   ```
-
-Make sure to replace `your_weclapp_api_token_here` with the actual token you
-obtained from Weclapp. This step is crucial for authenticating your Laravel
-application's requests to Weclapp's API.
-
-The following additional environment variables are supported (see the
-[config file](config/weclapp-api.php) for details):
+Set your Weclapp instance URL and personal API token in `.env`. Create a token
+under *My settings → API* in Weclapp.
 
 ```
-MINDTWO_WECLAPP_QUEUE_API_CALLS=
-MINDTWO_WECLAPP_QUEUE_CONNECTION=
-MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE=
+MINDTWO_WECLAPP_URL="https://your-tenant.weclapp.com/webapp/api/v2/"
+MINDTWO_WECLAPP_API_KEY="your_weclapp_api_token"
+```
+
+Other supported variables (see [`config/weclapp-api.php`](config/weclapp-api.php)):
+
+```
+MINDTWO_WECLAPP_PAGE_SIZE=1000            # records per page (Weclapp caps at 1000)
+MINDTWO_WECLAPP_TIMEZONE=UTC              # timezone for epoch-ms date conversion
+MINDTWO_WECLAPP_HTTP_TIMEOUT=60
+MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT=10
+MINDTWO_WECLAPP_HTTP_RETRY_TIMES=3
+MINDTWO_WECLAPP_HTTP_RETRY_SLEEP=500
+MINDTWO_WECLAPP_QUEUE_CONNECTION=         # connection for queued API-call jobs
+MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE=100 # limit applied to queued API-call jobs
+MINDTWO_WECLAPP_WRITES_ENABLED=           # see "Write suppression" below
+MINDTWO_WECLAPP_VISIBLE_TAG=              # article tag mirrored as `visible`; empty = every article
+MINDTWO_WECLAPP_LOG_EVENTS=false          # log every WeclappApiCallCompleted event
 ```
 
 ## Usage
 
-This package provides a clean and intuitive Facade interface for interacting with Weclapp's API. All endpoints can be accessed through the `Weclapp` facade, making your code more readable and maintainable.
+```php
+use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
+```
 
-### Using the Facade
+### Typed endpoints
 
-First, import the Weclapp facade at the top of your PHP file:
+Each entity accessor returns an endpoint object. Reads execute immediately:
 
 ```php
-use Mindtwo\LaravelWeclappApi\Facades\WeclappClient as Weclapp;
+// Collections are fully paginated and merged into one Collection
+$parties = WeclappClient::parties()->query(['company-eq' => 'ACME GmbH']);
+
+// A single record, or null on 404
+$article = WeclappClient::articles()->find(20001);
+
+// A count
+$open = WeclappClient::quotations()->count(['status-eq' => 'OPEN']);
 ```
 
-Now you can access all Weclapp endpoints through the facade:
+There is an accessor for every documented resource — from the everyday
+`parties()`, `articles()`, `quotations()`, `salesOrders()`, `users()` through to
+`tickets()`, `warehouseStocks()`, `productionOrders()`, `timeRecords()` and
+`customAttributeDefinitions()`. See the `WeclappClient` facade docblock for the
+full list.
+
+Whether your Weclapp plan and API user can actually reach a given resource is a
+separate question: an unlicensed module or a restricted token answers `403`. The
+class existing does not imply access.
+
+### Read-only and partially writable resources
+
+Reads work on every resource, but writes do not. Roughly a fifth of the API is
+read-only (reports and system-maintained lists such as `salesOpenItems()` or
+`warehouseStocks()`), and a handful support only some verbs — `users()` has no
+delete, `documents()` has no create. Each class declares what the spec
+documents, and an unsupported call fails immediately rather than going out as a
+request Weclapp would reject:
 
 ```php
-// Tasks
-Weclapp::tasks()->index($filters);
-Weclapp::tasks()->show($taskId);
-Weclapp::tasks()->create($taskDetails);
-Weclapp::tasks()->update($taskId, $updates);
-Weclapp::tasks()->delete($taskId);
+WeclappClient::salesOpenItems()->query();    // fine
+WeclappClient::salesOpenItems()->create([]); // BadMethodCallException
 
-// Custom Fields
-Weclapp::customFields()->show($entityId);
-Weclapp::customFields()->set($entityId, $fieldId, $value);
-
-// Attachments
-Weclapp::attachments()->create($entityId, $fileData);
-
-// Webhooks
-Weclapp::webhooks()->create($workspaceId, $webhookDetails);
+WeclappClient::tickets()->writes();          // ['create', 'update', 'delete']
+WeclappClient::salesOpenItems()->writes();   // []
 ```
 
-### Alternative: Using the app() Helper
-
-If you prefer not to use facades, you can still access endpoints using the `app()` helper:
+Weclapp has no separate customer or supplier resource — both are parties
+carrying a boolean flag. `customers()` and `suppliers()` are therefore filtered
+views of `/party`, and any filter you pass is merged on top:
 
 ```php
-app(\Mindtwo\LaravelWeclappApi\Http\Endpoints\Task::class)->create($taskDetails);
+WeclappClient::customers()->query(['company-eq' => 'ACME GmbH']);
+// GET /party?customer-eq=true&company-eq=ACME+GmbH
 ```
 
-However, we recommend using the Facade for cleaner and more readable code.
+### What the spec does not tell you about writes
 
-### Task Endpoint Usage
+The OpenAPI spec describes shape, not behaviour. Everything below was established
+against a live tenant and costs real time to rediscover, so it is recorded here.
 
-The `Task` class within the Laravel Weclapp API package provides a simple
-interface for interacting with Weclapp's Task-related API endpoints. This class
-allows you to list, view, create, update, and delete tasks within Weclapp,
-directly from your Laravel application. Here's a quick overview of how to use
-it:
+**Weclapp omits null fields from JSON entirely.** An absent key is indistinguishable
+from a field that does not exist, which is why a sampled response is never evidence
+that a field is unsupported — and why the trap below exists at all.
 
-- **List Tasks**: Retrieve tasks, optionally filtered via query parameters.
-- **Show Task Details**: Get detailed information about a specific task using
-  its task ID.
-- **Create Task**: Create a new task by providing an array of task details.
-- **Update Task**: Update an existing task by providing the task ID and the
-  details to be updated.
-- **Delete Task**: Delete a task using its task ID.
+**A single-record GET is not envelope-wrapped.** Collections answer
+`{"result": [...]}`; `GET /{resource}/id/{id}` returns the record itself.
+`find()` accounts for this, `get()` unwraps the envelope.
 
-#### How to Use:
-
-First, import the facade:
+**PUT is a full replace, and omitting a field counts as changing it.** This turns a
+seemingly harmless partial update into a permission error:
 
 ```php
-use Mindtwo\LaravelWeclappApi\Facades\WeclappClient as Weclapp;
+// 403 — the payload omits articleType, which reads as changing it
+WeclappClient::put('article', $id, ['shortDescription1' => 'x']);
+
+// The only shape that works: re-read, merge, send the whole record back
+$record = (array) WeclappClient::find('article', $id);
+WeclappClient::put('article', $id, [...$record, 'shortDescription1' => 'x']);
 ```
 
-1. **Create a Task**: To create a new task, you can use the `create` method.
-   Pass an array of data that specifies the task details.
+**Refusals are field-level and come in two flavours**, neither of which is a plain
+403 on the endpoint:
 
-   ```php
-   $taskDetails = [
-       'subject' => 'New Task', // Mandatory
-       'description' => 'Task description', // Optional
-       // Add other task details as needed
-   ];
+| Response | Meaning |
+| --- | --- |
+| `403 missing permissions for {field}` | the role may not write that field |
+| `400 no authorization to access property or referenced entity` | same thing, different field |
+| `400 validation failed` + `validationErrors[]` | a real content problem; read `location` and `detail` |
 
-   $task = Weclapp::tasks()->create($taskDetails);
-   ```
+**A field can be required on write yet absent on read — and the absence may be a
+permission, not a null.** `article` demands `primarySupplySourceId` as soon as
+`supplySources` is non-empty. On one tenant that field was missing from **every** one
+of 758 articles, which made 455 of them unwritable: read-modify-write could not satisfy
+the validation, supplying a derived value was refused separately, and dropping the
+collection was refused too.
 
-2. **Get Tasks**: To retrieve tasks, use the `index` method with an optional
-   array of query parameters to filter the results.
+It turned out Weclapp was **hiding** the field because the token lacked read access to
+the `articleSupplySource` entity. Granting that access made the field appear on all 455
+and every article writable. So an absent field can mean "null", "not supported", *or*
+"you may not see this" — and only the third is fixable by asking. When a required field
+is missing, check whether its referenced entity is readable before concluding the record
+cannot be written.
 
-   ```php
-   $tasks = Weclapp::tasks()->index([]);
-   ```
+**Nested collections do not share one rule.** On `article`, `articleImages` may be
+emptied but `articlePrices` may not — removing a price is a delete, and a separate
+permission. Test each collection rather than generalising from one.
 
-3. **Show Task Details**: To get detailed information about a task, use the
-   `show` method with the task ID.
+**Some resources are GET-only at the HTTP level.** `articlePrice` answers `405` to
+both `POST` and `DELETE`; prices exist only as a nested collection on the article, so
+every price write goes through `PUT /article`. Whether you may *remove* one is a
+separate permission from creating it — on one tenant deletion was refused while creation
+was allowed, which made a wrongly created price removable only in the Weclapp UI. Do not
+assume that being able to add implies being able to undo.
 
-   ```php
-   $task = Weclapp::tasks()->show($taskId);
-   ```
+**Duplicate detection is content-level.** A second list price with the same scale and
+sales channel is `400 validation failed`, not a permission problem. The same payload
+on a free scale, or scoped to a customer, is accepted.
 
-4. **Update a Task**: To update an existing task, use the `update` method with
-   the task ID and an array of data with the details you wish to update.
+**`dryRun` genuinely does not persist** — verified by comparing the record byte-for-byte
+before and after — but it is **not available everywhere**. It exists on `PUT`/`DELETE`
+for `article` and `party`; `uploadArticleImage` has no dry run at all, so an image
+write cannot be validated before it happens.
 
-   ```php
-   $updatedDetails = [
-       'name' => 'Updated Task Name',
-       // Other task details you want to update
-   ];
+**`/system/permissions` is not a reliable account of what a token may do.** It returns
+the catalogue of right names and disagrees with observed behaviour in both directions —
+on one tenant it claimed read access to resources that answered `403`, and omitted one
+that worked. Probe the operation you care about instead of reading the list.
 
-   $updatedTask = Weclapp::tasks()->update($taskId, $updatedDetails);
-   ```
+### Writes and the lazy response proxy
 
-5. **Delete a Task**: To delete a task, use the `delete` method with the task
-   ID.
-
-   ```php
-   $response = Weclapp::tasks()->delete($taskId);
-   ```
-
-These examples demonstrate the fundamental operations you can perform on tasks
-within Weclapp through your Laravel application, providing a powerful way to
-integrate task management functionalities into your workflow.
-
-### Attachment Endpoint Usage
-
-The `Attachment` class within this Laravel package facilitates the creation of
-attachments in tasks on Weclapp. By utilizing the `create` method, users can
-easily upload files and associate them with a specific task by its ID. This
-functionality enhances the task management process, allowing for a more detailed
-and resource-rich task structure.
-
-To use this endpoint, first ensure that you have a task ID (`$taskId`) where you
-want to attach a file, and prepare the data (`$data`) according to the Weclapp
-API specifications for attachments. The `$data` should include the file
-information structured in a way that's compatible with Weclapp's expectations
-for attachment uploads.
-
-Here's a basic example on how to use the `Attachment` endpoint:
+`create()`, `update()` and `delete()` return a `LazyResponseProxy`. It behaves
+like an `Illuminate\Http\Client\Response` when you read from it, executing the
+request on first access:
 
 ```php
-<?php
+$response = WeclappClient::quotations()->create($payload);
 
-use Mindtwo\LaravelWeclappApi\Facades\WeclappClient as Weclapp;
-
-// Assuming $taskId holds the ID of the task you want to attach a file to
-// and $data contains the file and other required information as an array
-$taskId = 'your_task_id_here';
-$data = [
-    [
-        'name' => 'file',
-        'contents' => fopen('/path/to/your/file', 'r'),
-        'filename' => 'filename.ext',
-    ],
-    // Add other data fields as required by the Weclapp API for an attachment
-];
-
-// Creating an attachment to a task
-Weclapp::attachments()->create($taskId, $data);
+$id = $response->json()['id']; // executes here
 ```
 
-This simple interface abstracts away the complexity of dealing with multipart
-file uploads and the Weclapp API, allowing you to focus on building your
-application. Remember to replace `'your_task_id_here'` with the actual ID of the
-task you're targeting and to adjust the `$data` array with the correct file path
-and other necessary information as per your requirements.
-
-### Custom Fields Endpoint Usage
-
-The `CustomField` class within our Laravel Weclapp API package serves as a
-dedicated endpoint for interacting with custom fields in Weclapp. Custom fields
-are pivotal in tailoring Weclapp's entities to your business-specific
-requirements, allowing for the addition of unique data fields to records.
-Utilizing the `CustomField` class, you can effortlessly retrieve all custom
-fields associated with a specific entity by providing the entity's ID.
-
-Here's a quick guide on how to use the `CustomField` endpoint to fetch custom
-fields:
+Or hand back an undispatched, rate-limited job instead of executing inline:
 
 ```php
-// Import the Weclapp facade at the top of your PHP file
-use Mindtwo\LaravelWeclappApi\Facades\WeclappClient as Weclapp;
+$job = WeclappClient::quotations()->create($payload)->getJob();
 
-// Assuming you have an entity ID, you can retrieve its custom fields like so:
-$entityId = 'your_entity_id_here'; // Replace with your actual entity ID
-
-// Fetch the custom fields for the specified entity
-$customFields = Weclapp::customFields()->show($entityId);
-
-// $customFields now contains the response from Weclapp API
+dispatch($job); // or batch several with Bus::batch([...])
 ```
 
-Ensure you replace `'your_entity_id_here'` with the actual ID of the entity
-whose custom fields you wish to retrieve. This simple and intuitive approach
-allows you to integrate custom field data from Weclapp directly into your
-Laravel application, enhancing data management and customization capabilities.
+Either path emits a `Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted`
+event on success and failure, so consumers can react without threading return
+values through the call stack.
 
-### ListCustomFieldsCommand
+### Low-level client
 
-The ListCustomFieldsCommand class is a Laravel console command provided by the
-Laravel Weclapp API package, enabling users to list all available custom fields
-for a specified entity in Weclapp. By executing the command `php artisan
-weclapp:list-custom-fields`, users can either provide an entity ID or mapping
-key directly via the `--entity` option or they will be prompted to enter it.
-This command is particularly useful for developers and administrators who need
-to quickly view the custom field configurations within their Weclapp entities,
-including details such as field ID, name, type, configuration options, creation
-date, visibility, and whether the field is required. The command outputs this
-information in a well-organized table format, making it easy to read and analyze
-directly from the terminal.
-
-## Webhook Security
-
-Securing your Weclapp webhook endpoints is crucial to ensure that only legitimate webhook events from Weclapp are processed by your application. This package provides built-in signature verification using HMAC-SHA256.
-
-### How Webhook Signature Verification Works
-
-When Weclapp sends a webhook event to your application, it includes an `X-Signature` header containing an HMAC-SHA256 hash of the webhook payload. This signature is generated using a secret key that is shared between Weclapp and your application.
-
-The verification process:
-1. Weclapp sends a webhook request with an `X-Signature` header
-2. Your application retrieves the webhook secret from the database
-3. The application computes the expected signature using HMAC-SHA256
-4. The computed signature is compared with the provided signature using a timing-safe comparison
-5. If the signatures match, the webhook is authentic and processing continues
-
-### Registering the Middleware
-
-To enable webhook signature verification, register the middleware in your application. You have two options:
-
-**Option 1: Register globally in `bootstrap/app.php` (Laravel 11+)**
+Every documented resource has a typed class, so the generic methods are for what
+falls outside that: the undocumented corners of the API, and the ~190 nested
+action paths. They hit any resource:
 
 ```php
-use Mindtwo\LaravelWeclappApi\Http\Middleware\VerifyWeclappWebhookSignature;
-
-return Application::configure(basePath: dirname(__DIR__))
-    ->withMiddleware(function (Middleware $middleware) {
-        $middleware->alias([
-            'weclapp.webhook' => VerifyWeclappWebhookSignature::class,
-        ]);
-    })
-    // ...
-    ->create();
+WeclappClient::get('salesChannel');                       // paginated Collection
+WeclappClient::find('unit', 5);                           // ?object
+WeclappClient::count('article');                          // int
+WeclappClient::post('quotation', $payload, dryRun: true); // array
+WeclappClient::put('warehouseStock', 7, $payload);        // array
+WeclappClient::delete('ticket', 9);                       // bool
 ```
 
-**Option 2: Register in `app/Http/Kernel.php` (Laravel 10)**
+`find()`, `put()` and `delete()` take the id separately because Weclapp
+addresses a single record as `/{resource}/id/{id}` — a bare `/{resource}/{id}`
+exists for no resource in the v2 API. Use `recordPath()` if you need to build
+that path yourself, e.g. for a nested action:
 
 ```php
-protected $middlewareAliases = [
-    // ... other middleware
-    'weclapp.webhook' => \Mindtwo\LaravelWeclappApi\Http\Middleware\VerifyWeclappWebhookSignature::class,
-];
+WeclappClient::post(WeclappClient::recordPath('salesOrder', 42).'/createCustomerReturn', []);
 ```
 
-### Applying the Middleware to Routes
-
-Once registered, apply the middleware to your webhook route:
+Binary sub-paths get their own two methods, because Weclapp handles files with
+neither JSON nor multipart:
 
 ```php
-// In your routes/web.php or routes/api.php
-Route::post('/webhooks/weclapp', [WebhookController::class, 'handle'])
-    ->middleware('weclapp.webhook');
+// GET a binary; null on 404 so "there is no image" is not an exception
+$response = WeclappClient::download("article/id/{$id}/downloadMainArticleImage");
+
+// POST a binary. The bytes are the raw request body and the filename is a
+// required `name` query parameter — it is NOT multipart/form-data.
+WeclappClient::upload(
+    "article/id/{$id}/uploadArticleImage",
+    $bytes,
+    'photo.jpg',
+    'image/jpeg',
+    ['mainImage' => 'true'],
+);
 ```
 
-Note: The package automatically registers webhook routes if `webhook.enabled` is set to `true` in the config file. The middleware is applied automatically to these routes.
-
-### Webhook Secret Storage
-
-When you create a webhook using Weclapp's API, Weclapp generates a unique secret for that webhook. This secret must be stored in your database to enable signature verification.
-
-The package automatically captures and stores webhook secrets in the `weclapp_webhooks` table when creating webhooks via the `webhooks()->create()` or `webhooks()->createManaged()` methods:
+`put()` also takes a `dryRun` flag, which asks Weclapp to validate the payload
+without persisting it:
 
 ```php
-use Mindtwo\LaravelWeclappApi\Facades\WeclappClient as Weclapp;
-
-// Create a webhook - secret is automatically captured
-$response = Weclapp::webhooks()->create($workspaceId, [
-    'endpoint' => 'https://your-app.com/webhooks/weclapp',
-    'events' => ['taskCreated', 'taskUpdated'],
-]);
-
-// The webhook secret is stored in the database
-$webhook = $response['webhook'];
-// Secret is available at: $webhook['secret']
+WeclappClient::put('article', $id, $payload, dryRun: true);
 ```
 
-### Security Best Practices
+Note that write suppression covers a dry run too — it is still a PUT against the
+live tenant — so check `writesSuppressed()` rather than reading meaning into the
+empty array it returns.
 
-1. **Always use HTTPS**: Configure your webhook endpoint to use HTTPS to prevent man-in-the-middle attacks
-2. **Keep secrets secure**: Never commit webhook secrets to version control or expose them in logs
-3. **Validate webhook IDs**: The middleware checks that the webhook ID exists in your database before processing
-4. **Use timing-safe comparison**: The package uses `hash_equals()` for constant-time signature comparison to prevent timing attacks
-5. **Monitor failed attempts**: Failed signature verifications are logged with IP addresses for security monitoring
-6. **Disable inactive webhooks**: Use the health monitoring system to automatically disable failing webhooks
+### Write suppression
 
-### Troubleshooting Signature Verification
-
-If webhook signature verification is failing:
-
-1. **Check the webhook exists**: Ensure the webhook is registered in your `weclapp_webhooks` table
-2. **Verify the secret is stored**: Check that the `secret` column is not null for the webhook
-3. **Check the X-Signature header**: Ensure Weclapp is sending the `X-Signature` header
-4. **Review logs**: Check your Laravel logs for signature verification warnings
-5. **Test with Weclapp API**: Use Weclapp's webhook testing feature to verify your endpoint
-
-Example log entry for a failed verification:
+Mutating requests (`POST`/`PUT`/`DELETE`) can be suppressed so no data leaves
+your environment. When `weclapp-api.writes_enabled` is explicitly `false`, writes
+are logged and skipped (returning a neutral response), while reads continue
+normally. The default is live everywhere except the `local` and `testing`
+environments; a missing flag never blocks production. Override with:
 
 ```
-[2025-12-19 10:30:45] local.WARNING: Invalid Weclapp webhook signature
-{
-    "webhook_id": "wh_abc123",
-    "ip": "192.168.1.1"
-}
+MINDTWO_WECLAPP_WRITES_ENABLED=true
 ```
 
-## Webhook Health Monitoring
+## Mirroring entities
 
-This package includes automatic webhook health monitoring to ensure your Weclapp webhooks remain active and functional. The system periodically checks the health status of all registered webhooks and takes appropriate actions when issues are detected.
+The package ships Eloquent models and publishable migrations for
+`weclapp_*` tables, plus two commands that pull data into them.
 
-### Health Status
-
-Weclapp webhooks can have three health statuses:
-
-- **Active**: Webhook is healthy and receiving events
-- **Failing**: Webhook returns unsuccessful HTTP codes or exceeds 7 seconds response time
-- **Suspended**: Webhook has reached 100 failed events and no longer receives events from Weclapp
-
-### Automatic Health Checks
-
-To enable automatic health monitoring, add the following to your application's `app/Console/Kernel.php`:
-
-```php
-protected function schedule(Schedule $schedule): void
-{
-    // Check Weclapp webhook health every hour
-    $schedule->job(\Mindtwo\LaravelWeclappApi\Jobs\CheckWebhookHealth::class)
-        ->hourly()
-        ->name('weclapp-webhook-health-check')
-        ->withoutOverlapping();
-}
-```
-
-The health check job will:
-- Query the Weclapp API to fetch current webhook health status
-- Sync health data (status and fail count) to your local database
-- Log warnings when webhook status changes
-- Automatically disable webhooks that become failing or suspended
-
-### Manual Webhook Recovery
-
-If a webhook becomes failing or suspended, you can manually recover it using the recovery command:
-
-**Recover a single webhook:**
 ```bash
-php artisan weclapp:webhook-recover {webhook_id}
+# Full sync of one entity, or omit the argument to sync all supported entities
+php artisan weclapp:sync customers
+php artisan weclapp:sync
+
+# Incremental sync of records changed since a time (default: 24h ago)
+php artisan weclapp:update articles --since="2026-01-01 00:00:00"
 ```
 
-**Recover all failed/suspended webhooks:**
+Supported sync entities: `customers`, `suppliers`, `article-categories`,
+`articles`, `users`, `quotations`, `sales-orders`, `projects`, `article-prices`,
+`sales-invoices`.
+Customers and suppliers are both read from `/party` (filtered on the respective flag) and
+stored in the unified `weclapp_parties` table.
+
+> **`projects` is undocumented but real.** The `project` resource appears nowhere
+> in the official OpenAPI v2 spec, yet it responds and is populated
+> (live-confirmed). Because it is undocumented, Weclapp gives no compatibility
+> guarantee for it.
+
+### What the sync layer does not cover
+
+A `SyncDefinition` maps the flat scalar fields of one Weclapp record into one row
+of one mirror table. That is the whole model, and it is deliberate. The following
+are **left to the consuming application**:
+
+- **Nested collections** — a party's addresses and contacts, an order's items,
+  bank accounts. These stay in the API response; the mirror does not unpack them.
+- **Fan-out to several models from one response** — a definition targets exactly
+  one model.
+- **Cross-entity resolution** — resolving a foreign key by looking up another
+  local table before saving.
+- **Domain side effects** — a mirror row is passive data, not application state.
+- **Derived data** — anything computed from Weclapp records rather than returned
+  by Weclapp.
+- **Reconciliation** — the sync is additive and upserts by weclapp id. It does not
+  prune rows that were deleted or archived remotely.
+
+If you need any of these, use the client and typed endpoints directly and project
+the response into your own schema. The mirror tables are for consumers that want a
+faithful local copy of Weclapp; they are not a prerequisite for using the package.
+
+### Adding a mirror for another entity
+
+Only a few of the 155 resources ship with a mirror table. Scaffold one from the
+vendored OpenAPI spec rather than hand-writing it:
+
 ```bash
-php artisan weclapp:webhook-recover --all
+php artisan weclapp:make-mirror articlePrice
+php artisan weclapp:make-mirror salesInvoice --dry              # preview
+php artisan weclapp:make-mirror ticket --only=id,subject        # trim up front
 ```
 
-The recovery command will:
-- Reactivate the webhook via Weclapp API by setting its status to active
-- Reset the fail count to 0
-- Enable the webhook in your local database
-- Provide console feedback on success or failure
-
-**Example output:**
-```
-Found 2 webhook(s) to recover.
-
-Attempting to recover webhook: wh_abc123
-  Status: failing
-  Endpoint: https://your-app.com/webhooks/weclapp
-  Fail count: 45
-  ✓ Successfully recovered webhook wh_abc123
-
-Attempting to recover webhook: wh_def456
-  Status: suspended
-  Endpoint: https://your-app.com/webhooks/weclapp
-  Fail count: 100
-  ✓ Successfully recovered webhook wh_def456
-
-Recovery complete: 2 successful, 0 failed
-```
+It writes the migration, model and factory with types, string lengths and
+factory enum values taken from the spec, skips nested collections, and prints
+the `SyncRegistry` entry to paste. Treat the output as a starting point and trim
+the columns you will not read.
 
 ## Testing
 
@@ -467,10 +388,55 @@ Recovery complete: 2 successful, 0 failed
 composer test
 ```
 
+## Upgrading
+
+### Environment variables are now `MINDTWO_WECLAPP_*` prefixed
+
+Every setting is read from a `MINDTWO_WECLAPP_`-prefixed variable. Previously the
+config read unprefixed `WECLAPP_*` names while `.env.example` already documented
+the prefixed ones, so a token placed under the documented name resolved to an
+empty string and requests went out unauthenticated. Rename the following in your
+`.env`:
+
+| Old | New |
+| --- | --- |
+| `WECLAPP_URL` | `MINDTWO_WECLAPP_URL` |
+| `WECLAPP_TOKEN` | `MINDTWO_WECLAPP_API_KEY` |
+| `WECLAPP_PAGE_SIZE` | `MINDTWO_WECLAPP_PAGE_SIZE` |
+| `WECLAPP_TIMEZONE` | `MINDTWO_WECLAPP_TIMEZONE` |
+| `WECLAPP_WRITES_ENABLED` | `MINDTWO_WECLAPP_WRITES_ENABLED` |
+| `WECLAPP_HTTP_TIMEOUT` | `MINDTWO_WECLAPP_HTTP_TIMEOUT` |
+| `WECLAPP_HTTP_CONNECT_TIMEOUT` | `MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT` |
+| `WECLAPP_HTTP_RETRY_TIMES` | `MINDTWO_WECLAPP_HTTP_RETRY_TIMES` |
+| `WECLAPP_HTTP_RETRY_SLEEP` | `MINDTWO_WECLAPP_HTTP_RETRY_SLEEP` |
+| `WECLAPP_QUEUE_CONNECTION` | `MINDTWO_WECLAPP_QUEUE_CONNECTION` |
+| `WECLAPP_RATE_LIMIT_PER_MINUTE` | `MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE` |
+| `WECLAPP_LOG_EVENTS` | `MINDTWO_WECLAPP_LOG_EVENTS` |
+| `WECLAPP_LOG_LEVEL` | `MINDTWO_WECLAPP_LOG_LEVEL` |
+| `WECLAPP_LOG_CHANNEL` | `MINDTWO_WECLAPP_LOG_CHANNEL` |
+| `WECLAPP_LOG_INCLUDE_PAYLOAD` | `MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD` |
+
+Note that `WECLAPP_TOKEN` is not simply prefixed — it becomes
+`MINDTWO_WECLAPP_API_KEY`.
+
+**If you have published `config/weclapp-api.php`**, your copy takes precedence
+over the package's, so nothing breaks until you re-publish — but the two have
+silently diverged. Rename the `env()` keys in your published config as well,
+otherwise re-publishing swaps in the new names and leaves your old `.env`
+unread. `tests/Vendor/ConfigEnvNamesTest.php` pins the package config and
+`.env.example` to each other.
+
+### `Amount` and `Report` have been removed
+
+The `Amount` and `Report` models, their factories and their migrations are gone,
+along with `Quotation::report()`. Neither was a Weclapp resource — no endpoint,
+no entry in the OpenAPI v2 spec — and `SyncRegistry` never populated them, so
+`weclapp_amounts` and `weclapp_reports` could not receive a row. If you
+published the migrations, drop both tables.
+
 ## Changelog
 
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed
-recently.
+Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
 
 ## Contributing
 
@@ -478,8 +444,7 @@ Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
 
 ## Security Vulnerabilities
 
-Please review [our security policy](../../security/policy) on how to report
-security vulnerabilities.
+Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
 
 ## Credits
 
