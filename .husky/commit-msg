@@ -1,13 +1,18 @@
 #!/bin/bash
 
-#export NVM_DIR="$HOME/.nvm"
+# Pick the first nvm that actually has node versions installed: a bare nvm.sh
+# with an empty versions/ dir makes `nvm use` fail on the .nvmrc version.
+for dir in "${NVM_DIR:-}" "$HOME/.nvm" "$HOME/Library/Application Support/Herd/config/nvm"; do
+    if [[ -s "$dir/nvm.sh" && -d "$dir/versions/node" ]]; then
+        export NVM_DIR="$dir"
+        break
+    fi
+done
 
 [[ -s "$NVM_DIR/nvm.sh" ]] && \. "$NVM_DIR/nvm.sh"
 
-if test -f ".nvmrc"; then
+if [[ -f ".nvmrc" ]] && command -v nvm >/dev/null 2>&1; then
     nvm use
 fi
 
-corepack enable
-
-pnpm dlx commitlint --edit "$1"
+npx --no-install commitlint --edit "$1"

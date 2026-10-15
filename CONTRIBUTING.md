@@ -10,6 +10,8 @@ guide will help you understand how to contribute effectively to this project.
 - [Development Setup](#development-setup)
 - [Coding Standards](#coding-standards)
 - [Adding New Endpoints](#adding-new-endpoints)
+- [Which entities have a mirror, and why](#which-entities-have-a-mirror-and-why)
+- [Adding a mirror entity or sync command](#adding-a-mirror-entity-or-sync-command)
 - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
 - [Reporting Issues](#reporting-issues)
@@ -81,7 +83,7 @@ Help improve test coverage by:
 
 - PHP 8.5 or higher
 - Composer 2
-- Node.js 24 (`lts/krypton`, see `.nvmrc`; requires `>=24.18.0`) and pnpm 11 (pinned to `11.11.0` via the `packageManager` field, requires `>=11.11.0`) — used for commit tooling and releases
+- Node.js 24 (`lts/krypton`, see `.nvmrc`; requires `>=24.18.0`) and npm 12 (pinned to `12.0.2` via the `packageManager` field, requires `>=12.0.0`) — used for commit tooling and releases
 - Git
 
 ### Initial Setup
@@ -97,7 +99,7 @@ Help improve test coverage by:
 3. **Install dependencies**:
    ```bash
    composer install
-   pnpm install
+   npm install
    ```
 
 4. **Create a feature branch**:
@@ -187,104 +189,242 @@ public function methodName(int|string $paramName, array $data): \Illuminate\Http
 
 ## Adding New Endpoints
 
-When adding new Weclapp API endpoints, follow these steps:
+Every typed endpoint extends the abstract `Http\Endpoints\Endpoint` base, which
+already provides `query()` / `find()` / `count()` (reads) and `create()` /
+`update()` / `delete()` (writes) against a resource path. In the common case a
+new endpoint is a three-line subclass — you do **not** re-implement the CRUD
+methods.
 
-### 1. Create the Endpoint Class
+### 1. Create the endpoint class
 
-Create a new file in `src/Endpoints/`:
+Create a file in `src/Http/Endpoints/` that declares the Weclapp resource
+segment:
 
 ```php
 <?php
 
-namespace Mindtwo\LaravelWeclappApi\Endpoints;
+declare(strict_types=1);
 
-use Mindtwo\LaravelWeclappApi\WeclappClient;
+namespace Mindtwo\LaravelWeclappApi\Http\Endpoints;
 
-class YourEndpoint
+class SalesChannel extends Endpoint
 {
-    public function __construct(protected WeclappClient $api)
-    {
-        //
-    }
-
-    /**
-     * Method documentation here.
-     *
-     * @param int|string $id The resource ID
-     * @param array $data Request data
-     *
-     * @return \Illuminate\Http\Client\Response
-     */
-    public function create(int|string $id, array $data): \Illuminate\Http\Client\Response
-    {
-        return $this->api->client->post(
-            sprintf('/resource/%s', $id),
-            $data
-        );
-    }
+    protected string $path = 'salesChannel';
 }
 ```
 
-### 2. Follow Existing Patterns
+That is usually all that is needed. Only override or add methods for behaviour
+the base cannot express (e.g. a sub-resource action). Writes must keep returning
+a `LazyResponseProxy` (return `new LazyResponseProxy($this->api, $path, $method, body: $data)`)
+so callers keep the sync/queue/event behaviour.
 
-- **Constructor**: Always use dependency injection with `WeclappClient`
-- **HTTP Methods**: Use the client's methods (`get`, `post`, `put`, `delete`)
-- **URL Building**: Use `sprintf()` for URL construction
-- **Return Types**: Return the raw `Response` object from HTTP client
-- **Type Hints**: Use `int|string` for IDs to support both formats
-
-### 3. Standard CRUD Methods
-
-If creating a resource endpoint, implement these methods:
-
-- `index()` - List resources
-- `show($id)` - Get single resource
-- `create($parentId, $data)` - Create new resource
-- `update($id, $data)` - Update existing resource
-- `delete($id)` - Delete resource
-
-### 4. Add Comprehensive PHPDocs
-
-Document all parameters, especially complex arrays:
+Resources that are not fully writable declare what the API offers, so an
+unsupported call fails in the guard instead of going out as a request Weclapp
+rejects:
 
 ```php
-/**
- * @param array $data Task data including:
- *                    - name (string, required): Task name
- *                    - description (string, optional): Task description
- *                    - assignees (array, optional): Array of user IDs
- */
-```
+class SalesOpenItem extends Endpoint
+{
+    protected string $path = 'salesOpenItem';
 
-### 5. Add Validation Where Needed
-
-Add validation for critical operations:
-
-```php
-if (empty($data['name'])) {
-    throw new InvalidArgumentException('Name is required.');
+    protected array $writes = [];
 }
 ```
 
-### 6. Update Documentation
+### 2. Register it
 
-Add usage examples to the README.md:
+- Add the class to the `ENDPOINTS` list in `WeclappApiServiceProvider` so it is
+  bound as a singleton.
+- Add an accessor to `WeclappClient` (e.g. `public function salesChannels(): SalesChannel { return app(SalesChannel::class); }`).
+- Add a matching `@method` line to the `WeclappClient` facade docblock.
+
+All three are enforced by `tests/Vendor/EndpointSpecConformanceTest.php`, which
+checks every class against the vendored spec rather than a hand-maintained list.
+Forget one and the suite tells you which.
+
+### Reading the vendored spec
+
+Everything below — endpoint paths, write verbs, mirror columns, factory values —
+comes out of the spec. Read it correctly or it will quietly tell you the wrong
+thing.
+
+**Two files, and they are not equivalent.** `docs/specifications/` holds both
+`weclapp-openapi_v2.yaml` and `weclapp-openapi_v2.json`. They agree exactly on
+`paths` (698), `components.schemas` (442) and `components.responses` (154). The
+JSON is a lossy conversion that drops `info.description` — **77k characters**
+documenting filter operators (`-eq`, `-in`, dot-notation predicates), the
+`properties=` partial-response parameter and PATCH semantics — plus all 207
+`tags` and 42 path descriptions. **Read the YAML for behaviour, the JSON for
+structure.** `SpecFilesAgreeTest` pins the parts that must stay in sync.
+
+**Schemas use `allOf` composition.** Reading `components.schemas.<x>.properties`
+directly returns an empty array for most resources; the fields live behind
+`$ref`s that must be resolved recursively:
 
 ```php
-### YourEndpoint Usage
+$resolve = function (string $name, array $seen = []) use (&$resolve, $schemas): array {
+    if (isset($seen[$name])) {
+        return [];
+    }
 
-Description of what this endpoint does.
+    $seen[$name] = true;
+    $out = [];
 
-```php
-use Mindtwo\LaravelWeclappApi\Endpoints\YourEndpoint;
+    foreach ($schemas[$name]['allOf'] ?? [] as $sub) {
+        $out += isset($sub['$ref'])
+            ? $resolve(basename($sub['$ref']), $seen)
+            : ($sub['properties'] ?? []);
+    }
 
-$result = app(YourEndpoint::class)->create($id, [
-    'name' => 'Example',
-    'description' => 'Description here',
-]);
+    return $out + ($schemas[$name]['properties'] ?? []);
+};
 ```
 
+`articlePrice` reports 0 properties unresolved and 16 resolved. Concluding "the
+spec has no schemas" from the unresolved read is a mistake that has already been
+made once.
+
+**Enums are `$ref`s to standalone schemas**, not inline lists. `salesInvoice.status`
+points at `salesInvoiceStatusType` (`CANCELLED`, `DOCUMENT_CREATED`,
+`ENTRY_COMPLETED`, `NEW`, `OPEN_ITEM_CREATED`); `salesChannel` points at
+`distributionChannel`, which has **600** values. Resolve them before writing any
+literal — `FactorySpecEnumTest` asserts the mirror factories only seed values the
+spec allows.
+
+**`maxLength` is documented** — size string columns from it rather than defaulting
+to `string()`.
+
+**There are no example responses.** Neither file contains a single `example` or
+`examples` key. The spec gives you shape, never values, so it cannot tell you
+which fields this tenant actually populates. That still needs a live read — see
+`bin/verify-live-paths.sh`.
+
+### How endpoint classes are validated
+
+`$path` and `$writes` are derived from `docs/specifications/weclapp-openapi_v2.json`,
+the vendored copy of the official spec, and the conformance test asserts they
+still match it. That is the whole contract of these classes — they hold no field
+mappings, so the spec is sufficient to keep them honest.
+
+Live validation is a separate, weaker guarantee, and it is limited by the API
+token available to us:
+
+- **83 of 153 resources are live-confirmed.** `GET /meta/resources` returns the
+  resources the calling token can see (82 of ours), each with its real operation
+  set; `project` was confirmed by a direct read.
+- **70 are spec-only.** Whole modules (ticketing, warehouse/storage, production,
+  variant articles, banking) answer `403` for our token because they are not
+  licensed or not granted, so they cannot be exercised at all. Note this includes
+  a few long-standing classes — `contract`, `purchaseInvoice`, `purchaseOrder`,
+  `shipment`, `warehouse` — not just recent additions.
+
+Do **not** narrow `$writes` to match `/meta/resources`. It disagrees with
+`GET /system/permissions` in both directions (for `article`, meta omits delete
+while permissions grant it and withhold create), so neither reflects the API
+contract — both describe one tenant's licensing and one user's rights. Encoding
+either would break the package for consumers with different rights.
+
+If you ever have a token with wider access, re-run the checks in
+`bin/verify-live-paths.sh` (read-only, `GET` requests only; it reads
+`MINDTWO_WECLAPP_URL` and `MINDTWO_WECLAPP_API_KEY` from `.env`) and compare
+`/meta/resources` against the class list; that is the only way to shrink the
+spec-only set.
+
+### 3. Method contract
+
+The inherited methods return:
+
+- `query(array $filters = []): Illuminate\Support\Collection` — all pages merged
+- `find(string|int $id): ?object` — `null` on 404
+- `count(array $filters = []): int`
+- `create(array)`, `update(string|int $id, array)`, `delete(string|int $id)` — a
+  `LazyResponseProxy`
+
+The generic client (`WeclappClient::get()/find()/count()/post()`) already reaches
+any Weclapp resource, so a typed class is only about ergonomics and discoverability.
+
+## Which entities have a mirror, and why
+
+The package exposes a typed endpoint for **every** resource the API documents,
+but ships a mirror table for only nine: `Article`, `ArticleCategory`,
+`ArticlePrice`, `Party`, `Project`, `Quotation`, `SalesInvoice`, `SalesOrder`,
+`User`. That gap is deliberate, and the two layers answer different questions.
+
+An endpoint class is `$path` plus `$writes`, both derivable from the spec and
+kept honest by a single conformance test — 155 of them cost nothing to maintain.
+A mirror is a table, a field map, a factory and reconciliation semantics, and it
+encodes a judgement the spec cannot make: *which fields are worth storing.*
+`salesInvoice` resolves to 73 scalar columns; the shipped mirror keeps 25.
+
+**The criterion is a consumer.** An entity earns a mirror when something reads
+it, or when it is committed groundwork for work already agreed. The current nine
+are the entities the first consuming application's sync commands covered, plus
+the sales and pricing set added for the per-tenant storage work. Nothing was added on the
+grounds that it might be useful one day.
+
+That rule exists because it was once broken: `weclapp_amounts` and
+`weclapp_reports` were built without a reader, could never receive a row, and
+were removed in `df9b58b`. Generating all 119 mirror-able resources would be the
+same mistake at scale — 357 files, 2,095 columns and a `weclapp:sync` that would
+hammer every licensed module.
+
+Since the generator makes adding one a single command, there is no benefit to
+pre-building them. `MakeMirrorCommandTest` runs every resource in the spec
+through the blueprint and parses the generated output, so bulk generation is
+proven to work whenever a consumer actually needs it.
+
+## Adding a mirror entity or sync command
+
+**Start with the generator.** It derives the whole scaffold from the spec, which
+is both faster and more accurate than hand-writing it:
+
+```bash
+php artisan weclapp:make-mirror articlePrice          # migration + model + factory
+php artisan weclapp:make-mirror salesInvoice --dry    # preview only
+php artisan weclapp:make-mirror ticket --only=id,subject,ticketNumber
 ```
+
+It resolves the `allOf` chain, maps types (`format: timestamp` → `datetime` and
+into `dates`; `format: decimal` → `decimal`; `*Id` and `version` → integer
+columns despite being serialised as strings), sizes strings from `maxLength`,
+seeds factory values from the property's enum, and drops nested collections and
+entity references with a printed reason. It then prints the `SyncRegistry` entry
+and `MIGRATIONS` line to paste, since editing those files automatically is more
+trouble than it is worth.
+
+Generated output is a **starting point, not a finished mirror** — `salesInvoice`
+resolves to 73 scalar columns and you almost certainly want a fraction of them.
+Trim before publishing, and add relations by hand.
+
+Doing it manually instead:
+
+1. Add a `weclapp_*` migration + Eloquent model + factory (mirror the existing
+   ones under `database/migrations`, `src/Models`, `database/factories`).
+2. Add a `SyncDefinition` entry to `Sync\SyncRegistry` mapping the endpoint,
+   model, the column → API-field `map`, epoch-ms `dates`, the match `key`, and
+   any static `defaults`.
+3. Register the migration in `WeclappApiServiceProvider::MIGRATIONS` so it gets a
+   `weclapp-api-migrations-{entity}` publish tag. `MigrationPublishTagTest` fails
+   if you forget.
+
+No command code changes are needed — the registry drives `weclapp:sync` and
+`weclapp:update`.
+
+**Derive the columns from the spec, not from a sampled response.** Resolve the
+resource's schema (see *Reading the vendored spec*) and take field names, types,
+`maxLength` and enum values from there.
+
+Sampling live responses to discover the shape does not work, because **Weclapp
+omits null fields from JSON entirely** — an absent key is indistinguishable from a
+field that does not exist. On `articlePrice`, a three-record sample shows 12
+fields; all 967 records show 16. The four that only appear sometimes include
+`customerId`, which is the entire basis of customer-specific pricing. A live read
+is still worth doing, but for a different question: which fields this tenant
+actually populates, and how densely.
+
+Nested collections (a party's addresses, an invoice's items, `reductionAdditions`)
+are deliberately out of scope for `SyncDefinition`, which maps flat scalars of one
+record into one row. Skip them and leave them to the consumer.
 
 ## Testing
 
@@ -295,16 +435,15 @@ Create test files in the `tests/` directory:
 ```php
 <?php
 
-use Mindtwo\LaravelWeclappApi\Endpoints\YourEndpoint;
+use Illuminate\Support\Facades\Http;
+use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 
-it('can create a resource', function () {
-    $endpoint = app(YourEndpoint::class);
+it('creates a resource', function () {
+    Http::fake(['*/salesChannel' => Http::response(['id' => '1'], 201)]);
 
-    $response = $endpoint->create('123', [
-        'name' => 'Test Resource',
-    ]);
+    $response = WeclappClient::salesChannels()->create(['name' => 'Test Resource']);
 
-    expect($response)->not->toBeNull();
+    expect($response->status())->toBe(201);
 });
 ```
 
@@ -334,23 +473,33 @@ Run tests matching a pattern:
 
 ### Commit Message Guidelines
 
-Write clear, descriptive commit messages:
+Releases are cut by semantic-release, which reads the **Conventional Commits**
+subject to choose the version bump and copies that line into `CHANGELOG.md`. The
+subject is therefore public API: keep it descriptive and free of internal
+shorthand.
 
 ```
-Add support for Weclapp Goals endpoint
+feat(weclapp-api): add an endpoint for the goal resource
 
-- Implement Goals CRUD operations
-- Add validation for goal creation
-- Include PHPDoc documentation
-- Add usage examples to README
+Explain why the change is needed and what it affects. Bullet points are fine.
+
+ticket(s):
+    - [sd-1234](https://app.clickup.com/t/30379192/SD-1234)
 ```
 
 **Format:**
 
-- First line: Brief summary (50 chars or less)
-- Blank line
-- Detailed description using bullet points
-- Reference issue numbers if applicable (`Fixes #123`)
+- Subject: `type(scope): summary` — `feat`, `fix`, `docs`, `test`, `chore`,
+  `refactor`, `build`, `ci`. Append `!` and add a `BREAKING-CHANGE:` trailer for
+  anything that breaks consumers.
+- Blank line, then a body explaining *why*, not restating the diff.
+- Internal work carries a `ticket(s):` trailer derived from the branch name.
+  **Ticket references belong in the body only, never in the subject** — squashed
+  commits included. Beyond the convention, semantic-release copies the subject
+  into the published `CHANGELOG.md`. External contributors should reference
+  GitHub issues instead (`Fixes #123`).
+
+GrumPHP validates the subject on commit.
 
 ### Pull Request Process
 
