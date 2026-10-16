@@ -21,6 +21,8 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('email')->nullable();
             $table->string('first_name')->nullable();
+            $table->boolean('is_customer')->default(false)->index();
+            $table->boolean('is_supplier')->default(false)->index();
             $table->datetime('last_modified')->nullable();
             $table->string('last_name')->nullable();
             $table->string('party_type')->nullable();

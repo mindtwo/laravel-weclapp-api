@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Mindtwo\LaravelWeclappApi\Database\Factories\PartyFactory;
 
 /**
- * A Weclapp party (customer or supplier), distinguished by party_type.
+ * A Weclapp party. Customer and supplier are roles a party carries, not kinds
+ * of party: `is_customer` and `is_supplier` mirror Weclapp's flags, while
+ * `party_type` says whether it is an organisation or a person.
  *
  * @property int $id
  * @property int|null $responsible_user_id
@@ -22,6 +25,8 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\PartyFactory;
  * @property string|null $description
  * @property string|null $email
  * @property string|null $first_name
+ * @property bool $is_customer
+ * @property bool $is_supplier
  * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $last_name
  * @property string|null $party_type
@@ -48,6 +53,8 @@ class Party extends Model
         'description',
         'email',
         'first_name',
+        'is_customer',
+        'is_supplier',
         'last_modified',
         'last_name',
         'party_type',
@@ -66,11 +73,29 @@ class Party extends Model
     }
 
     /**
+     * @param Builder<Party> $query
+     */
+    public function scopeCustomers(Builder $query): void
+    {
+        $query->where('is_customer', true);
+    }
+
+    /**
+     * @param Builder<Party> $query
+     */
+    public function scopeSuppliers(Builder $query): void
+    {
+        $query->where('is_supplier', true);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
+            'is_customer'         => 'boolean',
+            'is_supplier'         => 'boolean',
             'last_modified'       => 'datetime',
             'responsible_user_id' => 'integer',
             'sector_id'           => 'integer',

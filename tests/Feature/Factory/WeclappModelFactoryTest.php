@@ -41,7 +41,8 @@ it('casts party identifiers and dates', function () {
 it('supports the supplier factory state', function () {
     $supplier = Party::factory()->supplier()->create();
 
-    expect($supplier->party_type)->toBe('ORGANIZATION')
+    expect($supplier->is_supplier)->toBeTrue()
+        ->and($supplier->is_customer)->toBeFalse()
         ->and($supplier->customer_number)->toBeNull()
         ->and($supplier->supplier_number)->not->toBeNull();
 });

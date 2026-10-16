@@ -18,65 +18,91 @@ beforeEach(function () {
     config()->set('weclapp-api.timezone', 'UTC');
 });
 
-it('syncs customers into the parties mirror table', function () {
-    Http::fake(['*party*' => Http::response(['result' => [[
-        'id'                => '12345',
-        'customerNumber'    => 'C10001',
-        'company'           => 'Test GmbH',
-        'company2'          => 'Test Title',
-        'email'             => 'test@example.com',
-        'responsibleUserId' => '8001',
-        'sectorId'          => '9001',
-        'lastModifiedDate'  => 1700000000000,
-    ]]], 200)]);
+it('syncs every party with its roles and name into the parties mirror table', function () {
+    Http::fakeSequence()
+        ->push(['result' => [
+            [
+                'id'                => '12345',
+                'customer'          => true,
+                'supplier'          => false,
+                'customerNumber'    => 'C10001',
+                'company'           => 'Test GmbH',
+                'company2'          => 'Test Title',
+                'email'             => 'test@example.com',
+                'responsibleUserId' => '8001',
+                'sectorId'          => '9001',
+                'lastModifiedDate'  => 1700000000000,
+            ],
+            [
+                'id'             => '70001',
+                'customer'       => false,
+                'supplier'       => true,
+                'supplierNumber' => 'SU-10001',
+                'company'        => 'Supplier GmbH',
+                'firstName'      => 'Hans',
+                'lastName'       => 'Schmidt',
+                'salutation'     => 'MR',
+                'partyType'      => 'ORGANIZATION',
+            ],
+            // A private customer: a person with no company, which the old
+            // customers map mirrored without a name.
+            [
+                'id'        => '80001',
+                'customer'  => true,
+                'partyType' => 'PERSON',
+                'firstName' => 'Erika',
+                'lastName'  => 'Mustermann',
+            ],
+        ]], 200)
+        ->push(['result' => []], 200);
 
-    $this->artisan('weclapp:sync customers')->assertSuccessful();
+    $this->artisan('weclapp:sync parties')->assertSuccessful();
 
-    $party = Party::query()->firstOrFail();
+    $customer = Party::query()->where('weclapp_id', 12345)->firstOrFail();
+    $supplier = Party::query()->where('weclapp_id', 70001)->firstOrFail();
+    $person = Party::query()->where('weclapp_id', 80001)->firstOrFail();
 
-    expect($party->weclapp_id)->toBe(12345)
-        ->and($party->customer_number)->toBe('C10001')
-        ->and($party->company)->toBe('Test GmbH')
-        ->and($party->company_2)->toBe('Test Title')
-        ->and($party->responsible_user_id)->toBe(8001)
-        ->and($party->last_modified)->not->toBeNull();
+    expect($customer->is_customer)->toBeTrue()
+        ->and($customer->is_supplier)->toBeFalse()
+        ->and($customer->customer_number)->toBe('C10001')
+        ->and($customer->company_2)->toBe('Test Title')
+        ->and($customer->responsible_user_id)->toBe(8001)
+        ->and($customer->last_modified)->not->toBeNull()
+        ->and($supplier->is_supplier)->toBeTrue()
+        ->and($supplier->supplier_number)->toBe('SU-10001')
+        ->and($supplier->customer_number)->toBeNull()
+        ->and($supplier->last_name)->toBe('Schmidt')
+        ->and($supplier->party_type)->toBe('ORGANIZATION')
+        ->and($person->is_customer)->toBeTrue()
+        ->and($person->first_name)->toBe('Erika')
+        ->and($person->last_name)->toBe('Mustermann')
+        ->and(Party::customers()->count())->toBe(2)
+        ->and(Party::suppliers()->count())->toBe(1);
 
     Http::assertSent(fn ($request) => str_contains($request->url(), '/v2/party?')
-        && str_contains($request->url(), 'customer-eq=true'));
+        && ! str_contains($request->url(), 'customer-eq'));
 });
 
-it('syncs suppliers into the parties mirror table', function () {
-    Http::fake(['*party*' => Http::response(['result' => [[
-        'id'             => 70001,
-        'supplierNumber' => 'SU-10001',
-        'company'        => 'Supplier GmbH',
-        'firstName'      => 'Hans',
-        'lastName'       => 'Schmidt',
-        'salutation'     => 'MR',
-        'partyType'      => 'ORGANIZATION',
-    ]]], 200)]);
+it('drops a role a party lost in Weclapp', function () {
+    Party::factory()->create(['weclapp_id' => 12345, 'is_customer' => true, 'customer_number' => 'C10001']);
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '12345', 'customer' => false, 'supplier' => false]]], 200)
+        ->push(['result' => []], 200);
 
-    $this->artisan('weclapp:sync suppliers')->assertSuccessful();
+    $this->artisan('weclapp:sync parties')->assertSuccessful();
 
-    $party = Party::query()->firstOrFail();
+    $party = Party::query()->where('weclapp_id', 12345)->firstOrFail();
 
-    expect($party->weclapp_id)->toBe(70001)
-        ->and($party->supplier_number)->toBe('SU-10001')
-        ->and($party->customer_number)->toBeNull()
-        ->and($party->last_name)->toBe('Schmidt')
-        ->and($party->party_type)->toBe('ORGANIZATION');
-
-    Http::assertSent(fn ($request) => str_contains($request->url(), '/v2/party?')
-        && str_contains($request->url(), 'supplier-eq=true'));
+    expect($party->is_customer)->toBeFalse()
+        ->and($party->customer_number)->toBeNull();
 });
 
-it('combines the entity filter with a delta filter when updating', function () {
+it('sends the delta filter when updating parties', function () {
     Http::fake(['*party*' => Http::response(['result' => []], 200)]);
 
-    $this->artisan('weclapp:update customers --since=2026-01-01')->assertSuccessful();
+    $this->artisan('weclapp:update parties --since=2026-01-01')->assertSuccessful();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'customer-eq=true')
-        && str_contains($request->url(), 'lastModifiedDate-gt='));
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'lastModifiedDate-gt='));
 });
 
 it('is idempotent, upserting on weclapp_id', function () {
@@ -516,20 +542,18 @@ it('never archives on an empty response, which cannot be told apart from an outa
     expect(Article::query()->count())->toBe(2);
 });
 
-it('does not archive across definitions that share a model', function () {
-    // customers and suppliers are both filtered views of /party. A customer sync
-    // that archived "everything unseen" would take every supplier with it.
-    Party::factory()->create(['weclapp_id' => 70001, 'supplier_number' => 'SU-1', 'customer_number' => null]);
+it('archives parties Weclapp no longer returns', function () {
+    Party::factory()->create(['weclapp_id' => 70001, 'supplier_number' => 'SU-1']);
+    Http::fakeSequence()
+        ->push(['result' => [['id' => 12345, 'customer' => true, 'customerNumber' => 'C10001']]], 200)
+        ->push(['result' => []], 200);
 
-    Http::fake(['*party*' => Http::response(['result' => [[
-        'id'             => 12345,
-        'customerNumber' => 'C10001',
-    ]]], 200)]);
+    $this->artisan('weclapp:sync parties')
+        ->expectsOutputToContain('Archived 1 parties no longer in Weclapp.')
+        ->assertSuccessful();
 
-    $this->artisan('weclapp:sync customers')->assertSuccessful();
-
-    expect(Party::query()->count())->toBe(2)
-        ->and(Party::query()->where('weclapp_id', 70001)->exists())->toBeTrue();
+    expect(Party::query()->count())->toBe(1)
+        ->and(Party::withTrashed()->where('weclapp_id', 70001)->firstOrFail()->trashed())->toBeTrue();
 });
 
 it('reports nothing archived when the mirror already matches', function () {
@@ -556,7 +580,7 @@ describe('without an entity argument', function () {
         ]);
 
         $this->artisan('weclapp:sync')
-            ->expectsOutputToContain('Skipped customers: weclapp_parties is not migrated.')
+            ->expectsOutputToContain('Skipped parties: weclapp_parties is not migrated.')
             ->expectsOutputToContain('Synced 1 articles.')
             ->assertSuccessful();
 
@@ -584,7 +608,7 @@ describe('without an entity argument', function () {
         Http::fake(['*' => Http::response(['result' => []], 200)]);
 
         $this->artisan('weclapp:update')
-            ->expectsOutputToContain('Skipped customers: weclapp_parties is not migrated.')
+            ->expectsOutputToContain('Skipped parties: weclapp_parties is not migrated.')
             ->assertSuccessful();
     });
 });
@@ -593,8 +617,8 @@ it('does not skip a named entity whose table is missing', function () {
     Schema::drop('weclapp_parties');
     Http::fake(['*' => Http::response(['result' => [['id' => 30003, 'company' => 'ACME']]], 200)]);
 
-    $this->artisan('weclapp:sync customers')
-        ->expectsOutputToContain('customers:')
+    $this->artisan('weclapp:sync parties')
+        ->expectsOutputToContain('parties:')
         ->assertFailed();
 });
 

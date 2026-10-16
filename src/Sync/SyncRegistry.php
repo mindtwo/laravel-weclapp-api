@@ -24,9 +24,10 @@ use Mindtwo\LaravelWeclappApi\Models\User;
  * collection envelope is `{ "result": [...] }`. Every field mapped here was
  * observed on at least one live record.
  *
- * Customers and suppliers are both filtered views of /party — /customer and
- * /supplier return 404. The `project` endpoint is absent from the spec but is
- * real and populated (live-confirmed), so it is mapped from live responses.
+ * Customers and suppliers are one resource, /party, told apart by its `customer`
+ * and `supplier` flags — /customer and /supplier return 404. The `project`
+ * endpoint is absent from the spec but is real and populated (live-confirmed),
+ * so it is mapped from live responses.
  */
 final class SyncRegistry
 {
@@ -36,46 +37,38 @@ final class SyncRegistry
     public static function all(): array
     {
         return [
-            // customers and suppliers are the only two definitions sharing a model,
-            // and that is exactly why neither reconciles: each fetches its own
-            // filtered slice of /party, so letting either archive "everything I did
-            // not see" would wipe the other's rows on every run. Every other
-            // definition below owns its table outright and can reconcile safely.
-            'customers' => new SyncDefinition(
+            // One definition for the whole of /party rather than a filtered one per
+            // role: a party is a customer, a supplier, both or neither, and only an
+            // unfiltered read can see a role being dropped. Owning the table outright
+            // is also what lets it reconcile.
+            'parties' => new SyncDefinition(
                 endpoint: 'party',
                 model: Party::class,
                 map: [
                     'company'             => 'company',
                     'company_2'           => 'company2',
                     'customer_number'     => 'customerNumber',
+                    'description'         => 'description',
                     'email'               => 'email',
+                    'first_name'          => 'firstName',
+                    'last_name'           => 'lastName',
                     'party_type'          => 'partyType',
                     'phone'               => 'phone',
                     'responsible_user_id' => 'responsibleUserId',
+                    'salutation'          => 'salutation',
                     'sector_id'           => 'sectorId',
+                    'supplier_number'     => 'supplierNumber',
                     'website'             => 'website',
                     'weclapp_id'          => 'id',
                 ],
                 dates: ['last_modified' => 'lastModifiedDate'],
-                filters: ['customer-eq' => 'true'],
-            ),
-            'suppliers' => new SyncDefinition(
-                endpoint: 'party',
-                model: Party::class,
-                map: [
-                    'company'         => 'company',
-                    'description'     => 'description',
-                    'email'           => 'email',
-                    'first_name'      => 'firstName',
-                    'last_name'       => 'lastName',
-                    'party_type'      => 'partyType',
-                    'phone'           => 'phone',
-                    'salutation'      => 'salutation',
-                    'supplier_number' => 'supplierNumber',
-                    'weclapp_id'      => 'id',
+                // Weclapp sends the flags on every party, false included; the column
+                // default only covers a minimal fixture.
+                derive: [
+                    'is_customer' => fn (object $record): bool => (bool) ($record->customer ?? false),
+                    'is_supplier' => fn (object $record): bool => (bool) ($record->supplier ?? false),
                 ],
-                dates: ['last_modified' => 'lastModifiedDate'],
-                filters: ['supplier-eq' => 'true'],
+                reconciles: true,
             ),
             'article-categories' => new SyncDefinition(
                 endpoint: 'articleCategory',

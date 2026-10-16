@@ -23,6 +23,8 @@ class PartyFactory extends Factory
             'description'         => $this->faker->sentence(),
             'email'               => $this->faker->safeEmail(),
             'first_name'          => $this->faker->firstName(),
+            'is_customer'         => true,
+            'is_supplier'         => false,
             'last_modified'       => $this->faker->dateTime(),
             'last_name'           => $this->faker->lastName(),
             'party_type'          => $this->faker->randomElement(['ORGANIZATION', 'PERSON']),
@@ -39,7 +41,8 @@ class PartyFactory extends Factory
     public function supplier(): static
     {
         return $this->state(fn (): array => [
-            'party_type'      => 'ORGANIZATION',
+            'is_customer'     => false,
+            'is_supplier'     => true,
             'customer_number' => null,
             'supplier_number' => 'SU-'.$this->faker->unique()->numberBetween(10000, 99999),
         ]);

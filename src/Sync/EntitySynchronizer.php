@@ -113,8 +113,8 @@ final readonly class EntitySynchronizer
      * Three things have to be true before anything is archived, because each one
      * on its own would turn a normal run into a mass deletion:
      *
-     *  - the definition owns the whole table (`$reconciles`), otherwise the
-     *    customers sync would archive every supplier sharing the Party model;
+     *  - the definition owns the whole table (`$reconciles`); two definitions
+     *    sharing one model would each archive the other's rows;
      *  - no extra filters were applied, because a delta sync deliberately returns
      *    a fraction of the data and everything else would look stale;
      *  - at least one record carried a key, because a revoked permission or a

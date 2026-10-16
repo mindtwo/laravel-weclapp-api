@@ -52,7 +52,7 @@ php artisan migrate
 
 | Tag suffix | Table |
 | --- | --- |
-| `parties` | `weclapp_parties` (backs both `customers` and `suppliers`) |
+| `parties` | `weclapp_parties` (customers and suppliers, flagged per row) |
 | `article-categories` | `weclapp_article_categories` |
 | `articles` | `weclapp_articles` |
 | `users` | `weclapp_users` |
@@ -334,7 +334,7 @@ The package ships Eloquent models and publishable migrations for
 
 ```bash
 # Full sync of one entity, or omit the argument to sync all supported entities
-php artisan weclapp:sync customers
+php artisan weclapp:sync parties
 php artisan weclapp:sync
 
 # Incremental sync of records changed since a time (default: 24h ago)
@@ -352,11 +352,12 @@ duplicating the row. Both commands are `Isolatable`: schedule them with
 `--isolated` (or `->withoutOverlapping()`) so a slow nightly `weclapp:sync` and
 an hourly `weclapp:update` never run at the same time.
 
-Supported sync entities: `customers`, `suppliers`, `article-categories`,
-`articles`, `users`, `quotations`, `sales-orders`, `projects`, `article-prices`,
-`sales-invoices`.
-Customers and suppliers are both read from `/party` (filtered on the respective flag) and
-stored in the unified `weclapp_parties` table.
+Supported sync entities: `parties`, `article-categories`, `articles`, `users`,
+`quotations`, `sales-orders`, `projects`, `article-prices`, `sales-invoices`.
+Customers and suppliers are both `/party` records; the mirror keeps every party
+in `weclapp_parties` with Weclapp's `customer`/`supplier` flags as
+`is_customer`/`is_supplier`, and `Party::customers()` / `Party::suppliers()`
+scope a query to one role.
 
 > **`projects` is undocumented but real.** The `project` resource appears nowhere
 > in the official OpenAPI v2 spec, yet it responds and is populated

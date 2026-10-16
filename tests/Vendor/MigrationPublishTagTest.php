@@ -45,13 +45,7 @@ it('covers every migration with a publish tag', function () {
 });
 
 it('registers a per-entity tag for every sync entity', function () {
-    // customers and suppliers both mirror into weclapp_parties, so they share
-    // the `parties` tag rather than getting one each.
-    $entities = array_keys(SyncRegistry::all());
-    $expected = array_values(array_unique(array_map(
-        fn (string $entity): string => in_array($entity, ['customers', 'suppliers'], true) ? 'parties' : $entity,
-        $entities,
-    )));
+    $expected = array_keys(SyncRegistry::all());
 
     sort($expected);
     $tags = array_keys(migrationMap());
