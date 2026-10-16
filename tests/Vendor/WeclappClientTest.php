@@ -11,6 +11,19 @@ use Illuminate\Support\Sleep;
 use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 use Mindtwo\LaravelWeclappApi\WeclappClient as Client;
 
+/**
+ * The query string of a faked GET request, decoded; Request::offsetGet reads
+ * the body, which a GET does not have.
+ *
+ * @return array<string, string>
+ */
+function query(Illuminate\Http\Client\Request $request): array
+{
+    parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+    return $query;
+}
+
 beforeEach(function () {
     config()->set('weclapp-api.base_url', 'https://tenant.weclapp.com/webapp/api/v2/');
     config()->set('weclapp-api.token', 'test-token');
@@ -33,17 +46,70 @@ it('sends the authentication token header on requests', function () {
         && $request->hasHeader('Accept', 'application/json'));
 });
 
-it('paginates a collection endpoint until a short page is returned', function () {
+it('walks a collection by id cursor until an empty page comes back', function () {
     Http::fakeSequence()
         ->push(['result' => [['id' => '1'], ['id' => '2']]], 200)
-        ->push(['result' => [['id' => '3']]], 200);
+        ->push(['result' => [['id' => '3']]], 200)
+        ->push(['result' => []], 200);
 
     $result = WeclappClient::get('party');
 
     expect($result)->toBeInstanceOf(Collection::class)
         ->and($result)->toHaveCount(3);
 
+    Http::assertSentCount(3);
+    Http::assertSentInOrder([
+        fn ($request) => query($request)['sort'] === 'id' && query($request)['page'] === '1' && ! isset(query($request)['id-gt']),
+        fn ($request) => query($request)['sort'] === 'id' && query($request)['page'] === '1' && query($request)['id-gt'] === '2',
+        fn ($request) => query($request)['id-gt'] === '3',
+    ]);
+});
+
+it('keeps reading past a short page, since a resource may cap the page size below the configured one', function () {
+    // page_size is 2 here; a cap of 1 would make every page short.
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '1']]], 200)
+        ->push(['result' => [['id' => '2']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('party'))->toHaveCount(2);
+
+    Http::assertSentCount(3);
+});
+
+it('pages by offset when the caller orders the result itself', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '9'], ['id' => '8']]], 200)
+        ->push(['result' => [['id' => '7']]], 200);
+
+    expect(WeclappClient::get('party', ['sort' => '-id']))->toHaveCount(3);
+
     Http::assertSentCount(2);
+    Http::assertSentInOrder([
+        fn ($request) => query($request)['sort'] === '-id' && query($request)['page'] === '1' && ! isset(query($request)['id-gt']),
+        fn ($request) => query($request)['sort'] === '-id' && query($request)['page'] === '2' && ! isset(query($request)['id-gt']),
+    ]);
+});
+
+it('pages by offset when the caller filters on the id', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '5'], ['id' => '6']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('party', ['id-in' => '[5,6]']))->toHaveCount(2);
+
+    Http::assertSentInOrder([
+        fn ($request) => ! isset(query($request)['sort']) && query($request)['page'] === '1',
+        fn ($request) => ! isset(query($request)['sort']) && query($request)['page'] === '2',
+    ]);
+});
+
+it('stops after a page whose records carry no id rather than re-reading it forever', function () {
+    Http::fake(['*' => Http::response(['result' => [['name' => 'no id']]], 200)]);
+
+    expect(WeclappClient::get('party'))->toHaveCount(1);
+
+    Http::assertSentCount(1);
 });
 
 it('appends the dryRun flag to a post when requested', function () {
@@ -230,11 +296,12 @@ describe('retry policy', function () {
         Http::fakeSequence()
             ->push('', 503)
             ->push('', 503)
-            ->push(['result' => [['id' => '1']]], 200);
+            ->push(['result' => [['id' => '1']]], 200)
+            ->push(['result' => []], 200);
 
         expect(WeclappClient::get('party'))->toHaveCount(1);
 
-        Http::assertSentCount(3);
+        Http::assertSentCount(4);
     });
 
     it('retries a read after a connection error', function () {
@@ -244,10 +311,10 @@ describe('retry policy', function () {
                 throw new ConnectionException('timed out');
             }
 
-            return Http::response(['result' => [['id' => '1']]], 200);
+            return Http::response(['result' => []], 200);
         });
 
-        expect(WeclappClient::get('party'))->toHaveCount(1)
+        expect(WeclappClient::get('party'))->toHaveCount(0)
             ->and($calls)->toBe(2);
     });
 
@@ -271,5 +338,23 @@ describe('retry policy', function () {
         expect(WeclappClient::put('article', 5, ['name' => 'x']))->toBe(['id' => '5']);
 
         Http::assertSentCount(2);
+    });
+});
+
+describe('id cursor safety', function () {
+    it('treats a repeated short page as the end of the collection', function () {
+        // A fake that ignores the cursor hands the same page back; the first
+        // page already held everything, so the result is still complete.
+        Http::fake(['*' => Http::response(['result' => [['id' => '1']]], 200)]);
+
+        expect(WeclappClient::get('party'))->toHaveCount(1);
+
+        Http::assertSentCount(2);
+    });
+
+    it('fails loudly when a full page repeats, since everything behind it would be lost', function () {
+        Http::fake(['*' => Http::response(['result' => [['id' => '1'], ['id' => '2']]], 200)]);
+
+        expect(fn () => WeclappClient::get('party'))->toThrow(RuntimeException::class, 'ignored the id cursor');
     });
 });

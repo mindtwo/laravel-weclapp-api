@@ -124,9 +124,10 @@ final readonly class EntitySynchronizer
      *    records: a response full of records without an id would otherwise
      *    compile to `NOT IN ()`, which matches every row.
      *
-     * A truncated page is not a risk: WeclappClient::get() throws on a failed
-     * page rather than returning a short list, so this is never reached with a
-     * partial set.
+     * A partial set is not a risk: WeclappClient::get() throws on a failed page
+     * rather than returning a short list, and it walks the collection by id
+     * cursor, so a record deleted or inserted mid-read cannot shift a later
+     * page and drop a live record out of the result.
      *
      * The keys are inlined rather than bound: a tenant with more records than
      * the driver's placeholder limit (65 535 on MySQL and PostgreSQL, 32 766 on

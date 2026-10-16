@@ -166,6 +166,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\WarehouseStockMovement;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Webhook;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WeclappOs;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WorkScheduleProfile;
+use RuntimeException;
 use Throwable;
 
 class WeclappClient
@@ -239,6 +240,18 @@ class WeclappClient
     /**
      * Fetch every record from a paginated collection endpoint, merging all pages.
      *
+     * Pages are walked by key, not by offset: sorted by id, each request asks
+     * for the ids above the last one seen. Weclapp documents no default order,
+     * so offset pages over a collection that changes mid-read shift under the
+     * client — a record deleted on an earlier page moves the first record of
+     * the next page out of reach, and the sync then archives it as gone. A key
+     * cursor cannot shift. The loop ends on an empty page rather than a short
+     * one, because a resource whose cap is lower than the configured page size
+     * answers every page short.
+     *
+     * A caller that orders the result itself, or filters on the id, gets plain
+     * offset pages: a second sort or id filter would contradict its own.
+     *
      * @param array<string, mixed> $params
      *
      * @throws RequestException
@@ -249,14 +262,24 @@ class WeclappClient
     {
         // Weclapp caps pageSize at 1000; anything below 1 would never end the loop.
         $pageSize = max(1, min(1000, (int) config('weclapp-api.page_size', 1000)));
+        $keyset = ! isset($params['sort']) && ! $this->filtersOnId($params);
         $results = [];
         $page = 1;
+        $lastId = null;
 
         do {
-            $response = $this->client()->get($this->path($endpoint), array_merge($params, [
-                'page'     => $page,
-                'pageSize' => $pageSize,
-            ]));
+            $query = array_merge($params, ['page' => $page, 'pageSize' => $pageSize]);
+
+            if ($keyset) {
+                $query['sort'] = 'id';
+                $query['page'] = 1;
+
+                if ($lastId !== null) {
+                    $query['id-gt'] = $lastId;
+                }
+            }
+
+            $response = $this->client()->get($this->path($endpoint), $query);
 
             $response->throw();
 
@@ -265,12 +288,57 @@ class WeclappClient
                 'is_object',
             ));
 
-            $results = [...$results, ...$batch];
+            $pageLastId = $batch === [] ? null : (end($batch)->id ?? null);
+
+            // Sorted by id and filtered above the last one, a genuine page never
+            // repeats an id. A repeat means the cursor was ignored: a short page
+            // already held the whole collection, a full one would silently drop
+            // everything behind it, which the sync would then archive.
+            if ($keyset && $lastId !== null && $pageLastId !== null && (int) $pageLastId <= (int) $lastId) {
+                if (count($batch) >= $pageSize) {
+                    throw new RuntimeException(sprintf(
+                        'Weclapp ignored the id cursor on /%s: page after id %s ends at id %s.',
+                        $endpoint,
+                        $lastId,
+                        $pageLastId,
+                    ));
+                }
+
+                break;
+            }
+
+            array_push($results, ...$batch);
 
             $page++;
-        } while (count($batch) >= $pageSize);
+
+            // A record without an id cannot anchor the cursor; stop here so a
+            // malformed envelope ends the loop instead of re-reading the first
+            // page forever.
+            if ($keyset && $batch !== [] && $pageLastId === null) {
+                break;
+            }
+
+            $lastId = $pageLastId ?? $lastId;
+        } while ($batch !== [] && ($keyset || count($batch) >= $pageSize));
 
         return collect($results);
+    }
+
+    /**
+     * Whether the caller already constrains the id, which a key cursor would
+     * silently override.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function filtersOnId(array $params): bool
+    {
+        foreach (array_keys($params) as $key) {
+            if ($key === 'id' || str_starts_with((string) $key, 'id-')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

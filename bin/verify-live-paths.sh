@@ -65,8 +65,13 @@ FIRST_ID=$(curl -s --compressed -H "AuthenticationToken: ${WECLAPP_TOKEN}" -H 'A
 if [ -n "${FIRST_ID}" ]; then
   probe "article/id/${FIRST_ID} (spec shape)"  "article/id/${FIRST_ID}"
   probe "article/${FIRST_ID} (old shape)"      "article/${FIRST_ID}"
+
+  echo
+  echo '# Key-cursor pagination used by WeclappClient::get() (expect 200 for both)'
+  probe 'article sorted by id'                "article?sort=id&pageSize=1"
+  probe "article with id-gt=${FIRST_ID}"      "article?sort=id&id-gt=${FIRST_ID}&pageSize=1"
 else
-  echo 'Could not read an article id — skipping record-path check.'
+  echo 'Could not read an article id — skipping record-path and cursor checks.'
 fi
 
 echo

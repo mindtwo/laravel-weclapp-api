@@ -421,9 +421,12 @@ it('flags the configured tag as visible, and keeps mirroring the articles withou
 });
 
 it('flips visible off when the tag is removed, without losing the mirror row', function () {
+    // One record page and the empty page that ends the id cursor, per sync.
     Http::fake(['*article*' => Http::sequence()
         ->push(['result' => [['id' => 20001, 'article_number' => 'A-1', 'tags' => ['Cloud']]]], 200)
-        ->push(['result' => [['id' => 20001, 'article_number' => 'A-1', 'tags' => []]]], 200)]);
+        ->push(['result' => []], 200)
+        ->push(['result' => [['id' => 20001, 'article_number' => 'A-1', 'tags' => []]]], 200)
+        ->push(['result' => []], 200)]);
 
     $this->artisan('weclapp:sync articles')->assertSuccessful();
 
