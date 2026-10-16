@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('sales_order_id')->nullable()->index();
             $table->unsignedBigInteger('term_of_payment_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->nullable()->index();
-            $table->string('description')->nullable();
+            $table->text('description')->nullable();
             $table->decimal('gross_amount', 12, 2)->nullable();
             $table->datetime('invoice_date')->nullable();
             $table->string('invoice_number')->nullable();
