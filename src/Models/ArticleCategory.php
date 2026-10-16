@@ -13,6 +13,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleCategoryFactory;
 /**
  * @property int $id
  * @property int $weclapp_id
+ * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -27,6 +28,7 @@ class ArticleCategory extends Model
     protected $table = 'weclapp_article_categories';
 
     protected $fillable = [
+        'last_modified',
         'name',
         'weclapp_id',
     ];
@@ -50,7 +52,8 @@ class ArticleCategory extends Model
     protected function casts(): array
     {
         return [
-            'weclapp_id' => 'integer',
+            'last_modified' => 'datetime',
+            'weclapp_id'    => 'integer',
         ];
     }
 }

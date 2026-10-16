@@ -70,7 +70,10 @@ it('splits date fields out of the field map', function () {
     expect($blueprint->map())->toHaveKey('weclapp_id')
         ->and($blueprint->map())->not->toHaveKey('start_date')
         ->and($blueprint->dates())->toHaveKey('start_date')
-        ->and($blueprint->dates()['start_date'])->toBe('startDate');
+        ->and($blueprint->dates()['start_date'])->toBe('startDate')
+        // Named like the shipped mirrors, which the update command's delta relies on.
+        ->and($blueprint->dates())->toHaveKey('last_modified')
+        ->and($blueprint->dates()['last_modified'])->toBe('lastModifiedDate');
 });
 
 it('keeps weclapp_id even when --only omits it', function () {

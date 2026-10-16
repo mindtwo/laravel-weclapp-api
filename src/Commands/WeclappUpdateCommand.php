@@ -29,13 +29,18 @@ class WeclappUpdateCommand extends Command implements Isolatable
         $sinceMs = $this->since()->getTimestampMs();
 
         return $this->runSyncDefinitions(function (SyncDefinition $definition, string $slug) use ($sinceMs): void {
-            // Only entities that expose a modification timestamp can be filtered
-            // server-side; the rest fall back to a full sync.
-            $filters = isset($definition->dates['last_modified'])
-                ? ['lastModifiedDate-gt' => $sinceMs]
-                : [];
+            // The delta is a server-side filter on lastModifiedDate, which every
+            // Weclapp entity carries. A definition that does not map it gets no
+            // filter, and a sync without filters is a full one that reconciles —
+            // the opposite of what this command promises — so it is skipped
+            // rather than run silently as something else.
+            if (! in_array('lastModifiedDate', $definition->dates, true)) {
+                $this->warn(sprintf('Skipped %s: lastModifiedDate is not mapped; run weclapp:sync %s instead.', $slug, $slug));
 
-            $result = $this->synchronizer->sync($definition, $filters);
+                return;
+            }
+
+            $result = $this->synchronizer->sync($definition, ['lastModifiedDate-gt' => $sinceMs]);
 
             $this->info(sprintf('Updated %d %s.', $result['synced'], $slug));
         });

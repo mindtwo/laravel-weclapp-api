@@ -84,6 +84,7 @@ final class SyncRegistry
                     'name'       => 'name',
                     'weclapp_id' => 'id',
                 ],
+                dates: ['last_modified' => 'lastModifiedDate'],
                 reconciles: true,
             ),
             // articleImages is a nested collection and the rest of them are skipped,

@@ -17,8 +17,9 @@ class ArticleCategoryFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'       => $this->faker->words(2, true),
-            'weclapp_id' => $this->faker->unique()->numberBetween(10000, 99999),
+            'last_modified' => $this->faker->dateTime(),
+            'name'          => $this->faker->words(2, true),
+            'weclapp_id'    => $this->faker->unique()->numberBetween(10000, 99999),
         ];
     }
 }

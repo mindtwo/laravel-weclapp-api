@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Mindtwo\LaravelWeclappApi\Models\Article;
+use Mindtwo\LaravelWeclappApi\Models\ArticleCategory;
 use Mindtwo\LaravelWeclappApi\Models\ArticlePrice;
 use Mindtwo\LaravelWeclappApi\Models\Party;
 use Mindtwo\LaravelWeclappApi\Models\Quotation;
@@ -595,4 +596,24 @@ it('does not skip a named entity whose table is missing', function () {
     $this->artisan('weclapp:sync customers')
         ->expectsOutputToContain('customers:')
         ->assertFailed();
+});
+
+it('updates article categories incrementally, since they carry lastModifiedDate like every entity', function () {
+    Http::fake(['*articleCategory*' => Http::response(['result' => []], 200)]);
+
+    $this->artisan('weclapp:update article-categories --since=2026-01-01')
+        ->expectsOutputToContain('Updated 0 article-categories.')
+        ->assertSuccessful();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'lastModifiedDate-gt='));
+});
+
+it('maps lastModifiedDate onto article categories', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => 50001, 'name' => 'Pumps', 'lastModifiedDate' => 1791842399000]]], 200)
+        ->push(['result' => []], 200);
+
+    $this->artisan('weclapp:sync article-categories')->assertSuccessful();
+
+    expect(ArticleCategory::query()->firstOrFail()->last_modified?->toIso8601ZuluString())->toBe('2026-10-12T21:59:59Z');
 });

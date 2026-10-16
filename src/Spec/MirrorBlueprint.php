@@ -138,8 +138,13 @@ class MirrorBlueprint
             return 'reference to another entity';
         }
 
-        // The API's own id becomes weclapp_id; the table keeps its own key.
-        $column = $name === 'id' ? 'weclapp_id' : Str::snake($name);
+        // The API's own id becomes weclapp_id, the table keeping its own key, and
+        // the modification stamp takes the name every shipped mirror uses.
+        $column = match ($name) {
+            'id'               => 'weclapp_id',
+            'lastModifiedDate' => 'last_modified',
+            default            => Str::snake($name),
+        };
         $format = $property['format'] ?? null;
         $maxLength = $property['maxLength'] ?? null;
 
