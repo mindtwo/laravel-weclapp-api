@@ -15,7 +15,7 @@ return new class extends Migration
             $table->unsignedBigInteger('customer_id')->nullable();
             $table->unsignedBigInteger('quotation_id')->nullable();
             $table->unsignedBigInteger('responsible_user_id')->nullable();
-            $table->unsignedBigInteger('weclapp_id')->nullable()->index();
+            $table->unsignedBigInteger('weclapp_id')->unique();
             $table->decimal('gross_amount', 12, 2)->nullable();
             $table->datetime('last_modified')->nullable();
             $table->decimal('net_amount', 12, 2)->nullable();

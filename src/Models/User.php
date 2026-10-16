@@ -11,7 +11,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\UserFactory;
 
 /**
  * @property int $id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property string|null $email
  * @property string|null $first_name
  * @property \Illuminate\Support\Carbon|null $last_modified

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('customer_id')->nullable()->index();
             $table->unsignedBigInteger('currency_id')->nullable();
             $table->unsignedBigInteger('last_modified_by_user_id')->nullable();
-            $table->unsignedBigInteger('weclapp_id')->nullable()->index();
+            $table->unsignedBigInteger('weclapp_id')->unique();
             $table->string('description')->nullable();
             $table->datetime('end_date')->nullable();
             $table->datetime('last_modified')->nullable();

@@ -12,7 +12,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleCategoryFactory;
 
 /**
  * @property int $id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property string|null $name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at

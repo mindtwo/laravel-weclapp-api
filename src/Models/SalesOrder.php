@@ -15,7 +15,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\SalesOrderFactory;
  * @property int|null $customer_id
  * @property int|null $quotation_id
  * @property int|null $responsible_user_id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property string|null $gross_amount
  * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $net_amount

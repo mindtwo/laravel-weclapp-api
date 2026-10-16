@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('weclapp_projects', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('customer_id')->nullable();
-            $table->unsignedBigInteger('weclapp_id')->nullable()->index();
+            $table->unsignedBigInteger('weclapp_id')->unique();
             $table->text('description')->nullable();
             $table->datetime('last_modified')->nullable();
             $table->string('project_number')->nullable();

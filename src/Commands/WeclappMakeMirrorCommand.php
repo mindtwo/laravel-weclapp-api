@@ -179,10 +179,16 @@ class WeclappMakeMirrorCommand extends Command
                 default => sprintf("\$table->%s('%s')", $column['migration'], $column['name']),
             };
 
-            $call .= '->nullable()';
+            // The match key is never null (the sync skips records without an id)
+            // and unique, so two overlapping runs cannot insert the same record.
+            if ($column['name'] === 'weclapp_id') {
+                $call .= '->unique()';
+            } else {
+                $call .= '->nullable()';
 
-            if ($column['is_id']) {
-                $call .= '->index()';
+                if ($column['is_id']) {
+                    $call .= '->index()';
+                }
             }
 
             $lines[] = '            '.$call.';';

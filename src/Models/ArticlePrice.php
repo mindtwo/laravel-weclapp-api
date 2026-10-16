@@ -16,7 +16,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticlePriceFactory;
  * @property int|null $currency_id
  * @property int|null $customer_id
  * @property int|null $last_modified_by_user_id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property string|null $description
  * @property \Illuminate\Support\Carbon|null $end_date
  * @property \Illuminate\Support\Carbon|null $last_modified

@@ -346,6 +346,12 @@ Entities whose table you did not publish are skipped, and an entity Weclapp
 refuses (for example a `403` on an unlicensed module) is reported and does not
 stop the ones after it; the command then exits non-zero so a scheduler notices.
 
+Two runs of the same entity must not overlap — the mirror's `weclapp_id` is
+unique, so a second run racing the first fails on the insert instead of
+duplicating the row. Both commands are `Isolatable`: schedule them with
+`--isolated` (or `->withoutOverlapping()`) so a slow nightly `weclapp:sync` and
+an hourly `weclapp:update` never run at the same time.
+
 Supported sync entities: `customers`, `suppliers`, `article-categories`,
 `articles`, `users`, `quotations`, `sales-orders`, `projects`, `article-prices`,
 `sales-invoices`.

@@ -19,7 +19,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\SalesInvoiceFactory;
  * @property int|null $responsible_user_id
  * @property int|null $sales_order_id
  * @property int|null $term_of_payment_id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property string|null $description
  * @property string|null $gross_amount
  * @property \Illuminate\Support\Carbon|null $invoice_date

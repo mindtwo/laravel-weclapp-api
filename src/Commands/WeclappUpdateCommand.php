@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Mindtwo\LaravelWeclappApi\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Console\Isolatable;
 use Illuminate\Support\Carbon;
 use Mindtwo\LaravelWeclappApi\Commands\Concerns\RunsSyncDefinitions;
 use Mindtwo\LaravelWeclappApi\Sync\EntitySynchronizer;
 use Mindtwo\LaravelWeclappApi\Sync\SyncDefinition;
 
-class WeclappUpdateCommand extends Command
+class WeclappUpdateCommand extends Command implements Isolatable
 {
     use RunsSyncDefinitions;
 

@@ -17,7 +17,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ArticleFactory;
  * @property int|null $primary_supply_source_id
  * @property int $supply_source_count
  * @property int|null $unit_id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property bool $active
  * @property string|null $article_number
  * @property string|null $description

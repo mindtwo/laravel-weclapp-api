@@ -15,7 +15,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\PartyFactory;
  * @property int $id
  * @property int|null $responsible_user_id
  * @property int|null $sector_id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property string|null $company
  * @property string|null $company_2
  * @property string|null $customer_number

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('responsible_user_id')->nullable();
             $table->unsignedBigInteger('sector_id')->nullable();
-            $table->unsignedBigInteger('weclapp_id')->nullable()->index();
+            $table->unsignedBigInteger('weclapp_id')->unique();
             $table->string('company')->nullable();
             $table->string('company_2')->nullable();
             $table->string('customer_number')->nullable();

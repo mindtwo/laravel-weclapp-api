@@ -12,7 +12,7 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\ProjectFactory;
 /**
  * @property int $id
  * @property int|null $customer_id
- * @property int|null $weclapp_id
+ * @property int $weclapp_id
  * @property string|null $description
  * @property \Illuminate\Support\Carbon|null $last_modified
  * @property string|null $project_number

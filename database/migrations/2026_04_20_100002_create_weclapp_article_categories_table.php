@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('weclapp_article_categories', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('weclapp_id')->nullable()->index();
+            $table->unsignedBigInteger('weclapp_id')->unique();
             $table->string('name')->nullable();
             $table->timestamps();
             // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.

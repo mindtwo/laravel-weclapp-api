@@ -25,7 +25,7 @@ return new class extends Migration
             // and it re-appears by itself if that permission is ever withdrawn again.
             $table->unsignedBigInteger('primary_supply_source_id')->nullable();
             $table->unsignedBigInteger('unit_id')->nullable();
-            $table->unsignedBigInteger('weclapp_id')->nullable()->index();
+            $table->unsignedBigInteger('weclapp_id')->unique();
             $table->boolean('active')->default(true);
             $table->string('article_number')->nullable();
             $table->text('description')->nullable();
