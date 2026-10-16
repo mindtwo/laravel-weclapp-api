@@ -206,7 +206,8 @@ class WeclappClient
      */
     public function get(string $endpoint, array $params = []): Collection
     {
-        $pageSize = (int) config('weclapp-api.page_size', 1000);
+        // Weclapp caps pageSize at 1000; anything below 1 would never end the loop.
+        $pageSize = max(1, min(1000, (int) config('weclapp-api.page_size', 1000)));
         $results = [];
         $page = 1;
 

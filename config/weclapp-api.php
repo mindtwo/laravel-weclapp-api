@@ -38,7 +38,7 @@ return [
     |
     */
 
-    'page_size' => (int) env('MINDTWO_WECLAPP_PAGE_SIZE', 1000),
+    'page_size' => (int) (env('MINDTWO_WECLAPP_PAGE_SIZE') ?: 1000),
 
     /*
     |--------------------------------------------------------------------------
@@ -50,7 +50,7 @@ return [
     |
     */
 
-    'timezone' => env('MINDTWO_WECLAPP_TIMEZONE', 'UTC'),
+    'timezone' => env('MINDTWO_WECLAPP_TIMEZONE') ?: 'UTC',
 
     /*
     |--------------------------------------------------------------------------
@@ -60,14 +60,20 @@ return [
     | When false, mutating requests (POST/PUT/DELETE) are suppressed and logged
     | instead of sent; reads still go through. Defaults to live everywhere
     | except the local and testing environments. Override with
-    | MINDTWO_WECLAPP_WRITES_ENABLED.
+    | MINDTWO_WECLAPP_WRITES_ENABLED. An unset or blank variable keeps the
+    | default — a blank line in .env must never switch production writes off.
     |
     */
 
-    'writes_enabled' => (bool) env(
-        'MINDTWO_WECLAPP_WRITES_ENABLED',
-        ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true),
-    ),
+    'writes_enabled' => (static function (): bool {
+        $flag = env('MINDTWO_WECLAPP_WRITES_ENABLED');
+
+        if ($flag === null || $flag === '') {
+            return ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true);
+        }
+
+        return filter_var($flag, FILTER_VALIDATE_BOOL);
+    })(),
 
     /*
     |--------------------------------------------------------------------------
@@ -94,10 +100,10 @@ return [
     */
 
     'http' => [
-        'timeout'         => (int) env('MINDTWO_WECLAPP_HTTP_TIMEOUT', 60),
-        'connect_timeout' => (int) env('MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT', 10),
-        'retry_times'     => (int) env('MINDTWO_WECLAPP_HTTP_RETRY_TIMES', 3),
-        'retry_sleep'     => (int) env('MINDTWO_WECLAPP_HTTP_RETRY_SLEEP', 500),
+        'timeout'         => (int) (env('MINDTWO_WECLAPP_HTTP_TIMEOUT') ?: 60),
+        'connect_timeout' => (int) (env('MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT') ?: 10),
+        'retry_times'     => (int) (env('MINDTWO_WECLAPP_HTTP_RETRY_TIMES') ?: 3),
+        'retry_sleep'     => (int) (env('MINDTWO_WECLAPP_HTTP_RETRY_SLEEP') ?: 500),
     ],
 
     /*
@@ -112,8 +118,8 @@ return [
     |
     */
 
-    'queue_connection'      => env('MINDTWO_WECLAPP_QUEUE_CONNECTION'),
-    'rate_limit_per_minute' => (int) env('MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE', 100),
+    'queue_connection'      => env('MINDTWO_WECLAPP_QUEUE_CONNECTION') ?: null,
+    'rate_limit_per_minute' => (int) (env('MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE') ?: 100),
 
     /*
     |--------------------------------------------------------------------------
@@ -126,9 +132,9 @@ return [
     */
 
     'logging' => [
-        'enabled'         => (bool) env('MINDTWO_WECLAPP_LOG_EVENTS', false),
-        'level'           => env('MINDTWO_WECLAPP_LOG_LEVEL', 'info'),
-        'channel'         => env('MINDTWO_WECLAPP_LOG_CHANNEL'),
-        'include_payload' => (bool) env('MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD', false),
+        'enabled'         => filter_var(env('MINDTWO_WECLAPP_LOG_EVENTS'), FILTER_VALIDATE_BOOL),
+        'level'           => env('MINDTWO_WECLAPP_LOG_LEVEL') ?: 'info',
+        'channel'         => env('MINDTWO_WECLAPP_LOG_CHANNEL') ?: null,
+        'include_payload' => filter_var(env('MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD'), FILTER_VALIDATE_BOOL),
     ],
 ];
