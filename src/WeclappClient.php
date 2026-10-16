@@ -166,6 +166,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\WarehouseStockMovement;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Webhook;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WeclappOs;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WorkScheduleProfile;
+use Throwable;
 
 class WeclappClient
 {
@@ -190,9 +191,49 @@ class WeclappClient
             ->connectTimeout((int) config('weclapp-api.http.connect_timeout', 10))
             ->retry(
                 (int) config('weclapp-api.http.retry_times', 3),
-                (int) config('weclapp-api.http.retry_sleep', 500),
+                fn (int $attempt, Throwable $e): int => $this->retryDelay($attempt, $e),
+                fn (Throwable $e, PendingRequest $request, ?string $method): bool => $this->shouldRetry($e, $method),
                 throw: false,
             );
+    }
+
+    /**
+     * Whether a failed attempt may be sent again.
+     *
+     * A connection error or a 5xx leaves it open whether Weclapp processed the
+     * request, so only idempotent verbs are retried on those — re-sending a
+     * POST could create a second quotation or order. A 429 means Weclapp
+     * rejected the request before doing anything, so any verb may retry. Every
+     * other 4xx is a refusal that a retry cannot change, and find()/download()
+     * rely on a single 404 to mean "no such record".
+     */
+    protected function shouldRetry(Throwable $e, ?string $method): bool
+    {
+        $idempotent = in_array($method, ['GET', 'HEAD', 'PUT', 'DELETE'], true);
+
+        if ($e instanceof RequestException) {
+            $status = $e->response->status();
+
+            return $status === 429 || ($status >= 500 && $idempotent);
+        }
+
+        return $idempotent;
+    }
+
+    /**
+     * Milliseconds to wait before the next attempt: a numeric Retry-After from
+     * Weclapp wins (capped, since it can queue requests for up to 30 s), else
+     * the configured sleep grows linearly with the attempt.
+     */
+    protected function retryDelay(int $attempt, Throwable $e): int
+    {
+        $retryAfter = $e instanceof RequestException ? $e->response->header('Retry-After') : null;
+
+        if (is_numeric($retryAfter)) {
+            return min(30, max(1, (int) $retryAfter)) * 1000;
+        }
+
+        return $attempt * (int) config('weclapp-api.http.retry_sleep', 500);
     }
 
     /**

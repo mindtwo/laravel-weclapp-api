@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonInterval;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 use Mindtwo\LaravelWeclappApi\WeclappClient as Client;
 
@@ -177,4 +180,96 @@ it('suppresses an upload when writes are disabled', function () {
     expect(app(Client::class)->upload('article/id/1964/uploadArticleImage', 'bytes', 'a.jpg'))->toBe([]);
 
     Http::assertNothingSent();
+});
+
+describe('retry policy', function () {
+    beforeEach(function () {
+        config()->set('weclapp-api.http.retry_times', 3);
+        config()->set('weclapp-api.http.retry_sleep', 0);
+    });
+
+    it('does not retry a 404 when finding a record', function () {
+        Http::fake(['*' => Http::response('', 404)]);
+
+        expect(WeclappClient::find('party', 'nope'))->toBeNull();
+
+        Http::assertSentCount(1);
+    });
+
+    it('does not retry a refused write', function () {
+        Http::fake(['*' => Http::response(['detail' => 'invalid'], 422)]);
+
+        expect(fn () => WeclappClient::post('quotation', ['foo' => 'bar']))->toThrow(RequestException::class);
+
+        Http::assertSentCount(1);
+    });
+
+    // The fake does not record a request whose handler throws, so these two
+    // count the attempts themselves instead of using assertSentCount().
+    it('does not retry a post after a connection error, since Weclapp may have processed it', function () {
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            $calls++;
+
+            throw new ConnectionException('timed out');
+        });
+
+        expect(fn () => WeclappClient::post('quotation', ['foo' => 'bar']))->toThrow(ConnectionException::class)
+            ->and($calls)->toBe(1);
+    });
+
+    it('does not retry a post on a server error', function () {
+        Http::fake(['*' => Http::response('', 502)]);
+
+        expect(fn () => WeclappClient::post('quotation', ['foo' => 'bar']))->toThrow(RequestException::class);
+
+        Http::assertSentCount(1);
+    });
+
+    it('retries a read on a server error', function () {
+        Http::fakeSequence()
+            ->push('', 503)
+            ->push('', 503)
+            ->push(['result' => [['id' => '1']]], 200);
+
+        expect(WeclappClient::get('party'))->toHaveCount(1);
+
+        Http::assertSentCount(3);
+    });
+
+    it('retries a read after a connection error', function () {
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            if (++$calls < 2) {
+                throw new ConnectionException('timed out');
+            }
+
+            return Http::response(['result' => [['id' => '1']]], 200);
+        });
+
+        expect(WeclappClient::get('party'))->toHaveCount(1)
+            ->and($calls)->toBe(2);
+    });
+
+    it('retries a post that was rate limited, honouring Retry-After', function () {
+        Sleep::fake();
+        Http::fakeSequence()
+            ->push('', 429, ['Retry-After' => '2'])
+            ->push(['id' => 'q-1'], 201);
+
+        expect(WeclappClient::post('quotation', ['foo' => 'bar']))->toBe(['id' => 'q-1']);
+
+        Http::assertSentCount(2);
+        Sleep::assertSlept(fn (CarbonInterval $duration) => $duration->totalMilliseconds === 2000.0);
+    });
+
+    it('retries an idempotent put on a server error', function () {
+        Http::fakeSequence()
+            ->push('', 500)
+            ->push(['id' => '5'], 200);
+
+        expect(WeclappClient::put('article', 5, ['name' => 'x']))->toBe(['id' => '5']);
+
+        Http::assertSentCount(2);
+    });
 });
