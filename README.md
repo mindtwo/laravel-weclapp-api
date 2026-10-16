@@ -70,9 +70,11 @@ php artisan migrate
 ```
 
 Mirror tables have no foreign-key constraints between them — they correlate on
-`weclapp_id` — so publishing a subset is safe. The Eloquent relations (for
-example `ArticlePrice::article()`) simply return `null` if you did not publish
-the other side.
+`weclapp_id` — so publishing a subset is safe for the sync: run without an
+entity argument, `weclapp:sync` and `weclapp:update` skip every entity whose
+table is not migrated. The Eloquent relations are the exception: calling
+`ArticlePrice::article()` queries `weclapp_articles`, so publish both sides of
+any relation you read.
 
 ## Configuration
 
@@ -338,6 +340,11 @@ php artisan weclapp:sync
 # Incremental sync of records changed since a time (default: 24h ago)
 php artisan weclapp:update articles --since="2026-01-01 00:00:00"
 ```
+
+Without an entity argument both commands run every supported entity in turn.
+Entities whose table you did not publish are skipped, and an entity Weclapp
+refuses (for example a `403` on an unlicensed module) is reported and does not
+stop the ones after it; the command then exits non-zero so a scheduler notices.
 
 Supported sync entities: `customers`, `suppliers`, `article-categories`,
 `articles`, `users`, `quotations`, `sales-orders`, `projects`, `article-prices`,

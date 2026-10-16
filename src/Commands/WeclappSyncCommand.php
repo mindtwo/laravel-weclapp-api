@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Mindtwo\LaravelWeclappApi\Commands;
 
 use Illuminate\Console\Command;
+use Mindtwo\LaravelWeclappApi\Commands\Concerns\RunsSyncDefinitions;
 use Mindtwo\LaravelWeclappApi\Sync\EntitySynchronizer;
 use Mindtwo\LaravelWeclappApi\Sync\SyncDefinition;
-use Mindtwo\LaravelWeclappApi\Sync\SyncRegistry;
 
 class WeclappSyncCommand extends Command
 {
+    use RunsSyncDefinitions;
+
     protected $signature = 'weclapp:sync {entity? : Entity slug to sync; omit to sync all}';
 
     protected $description = 'Sync Weclapp entities into their mirror tables.';
@@ -22,13 +24,7 @@ class WeclappSyncCommand extends Command
 
     public function handle(): int
     {
-        $definitions = $this->resolveDefinitions();
-
-        if ($definitions === null) {
-            return self::FAILURE;
-        }
-
-        foreach ($definitions as $slug => $definition) {
+        return $this->runSyncDefinitions(function (SyncDefinition $definition, string $slug): void {
             $result = $this->synchronizer->sync($definition);
 
             $this->info(sprintf('Synced %d %s.', $result['synced'], $slug));
@@ -36,31 +32,6 @@ class WeclappSyncCommand extends Command
             if ($result['archived'] > 0) {
                 $this->warn(sprintf('Archived %d %s no longer in Weclapp.', $result['archived'], $slug));
             }
-        }
-
-        return self::SUCCESS;
-    }
-
-    /**
-     * @return array<string, SyncDefinition>|null
-     */
-    protected function resolveDefinitions(): ?array
-    {
-        $all = SyncRegistry::all();
-
-        $entity = $this->argument('entity');
-        $entity = is_string($entity) ? $entity : null;
-
-        if ($entity === null) {
-            return $all;
-        }
-
-        if (! isset($all[$entity])) {
-            $this->error(sprintf('Unknown entity "%s". Available: %s', $entity, implode(', ', array_keys($all))));
-
-            return null;
-        }
-
-        return [$entity => $all[$entity]];
+        });
     }
 }

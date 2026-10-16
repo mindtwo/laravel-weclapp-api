@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Mindtwo\LaravelWeclappApi\Models\Article;
 use Mindtwo\LaravelWeclappApi\Models\ArticlePrice;
 use Mindtwo\LaravelWeclappApi\Models\Party;
@@ -498,4 +499,56 @@ it('reports nothing archived when the mirror already matches', function () {
         ->assertSuccessful();
 
     expect(Article::withTrashed()->count())->toBe(1);
+});
+
+describe('without an entity argument', function () {
+    it('skips entities whose table is not migrated and syncs the rest', function () {
+        Schema::drop('weclapp_parties');
+        Http::fake([
+            '*article/count*' => Http::response(['result' => 0], 200),
+            '*article*'       => Http::response(['result' => [['id' => 30001, 'articleNumber' => 'A-1']]], 200),
+            '*'               => Http::response(['result' => []], 200),
+        ]);
+
+        $this->artisan('weclapp:sync')
+            ->expectsOutputToContain('Skipped customers: weclapp_parties is not migrated.')
+            ->expectsOutputToContain('Synced 1 articles.')
+            ->assertSuccessful();
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/party'));
+        expect(Article::query()->where('weclapp_id', 30001)->exists())->toBeTrue();
+    });
+
+    it('reports an entity Weclapp refuses, keeps going, and exits non-zero', function () {
+        Http::fake([
+            '*quotation*'    => Http::response(['detail' => 'forbidden'], 403),
+            '*articlePrice*' => Http::response(['result' => [['id' => 30002, 'articleId' => 1, 'price' => '1.00']]], 200),
+            '*'              => Http::response(['result' => []], 200),
+        ]);
+
+        $this->artisan('weclapp:sync')
+            ->expectsOutputToContain('quotations:')
+            ->expectsOutputToContain('Synced 1 article-prices.')
+            ->assertFailed();
+
+        expect(ArticlePrice::query()->where('weclapp_id', 30002)->exists())->toBeTrue();
+    });
+
+    it('applies the same guard to the incremental update', function () {
+        Schema::drop('weclapp_parties');
+        Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+        $this->artisan('weclapp:update')
+            ->expectsOutputToContain('Skipped customers: weclapp_parties is not migrated.')
+            ->assertSuccessful();
+    });
+});
+
+it('does not skip a named entity whose table is missing', function () {
+    Schema::drop('weclapp_parties');
+    Http::fake(['*' => Http::response(['result' => [['id' => 30003, 'company' => 'ACME']]], 200)]);
+
+    $this->artisan('weclapp:sync customers')
+        ->expectsOutputToContain('customers:')
+        ->assertFailed();
 });
