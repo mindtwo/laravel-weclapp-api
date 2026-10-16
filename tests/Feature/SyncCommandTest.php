@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Mindtwo\LaravelWeclappApi\Models\Article;
@@ -85,10 +87,49 @@ it('is idempotent, upserting on weclapp_id', function () {
     ]]], 200)]);
 
     $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    // The second run must leave an unchanged row alone: no write, so no
+    // updated_at bump that would make every row look changed on every sync.
+    $before = Article::query()->firstOrFail()->updated_at;
+    $this->travel(1)->hour();
+
     $this->artisan('weclapp:sync articles')->assertSuccessful();
 
     expect(Article::query()->count())->toBe(1)
-        ->and(Article::query()->firstOrFail()->article_number)->toBe('ART-001');
+        ->and(Article::query()->firstOrFail()->article_number)->toBe('ART-001')
+        ->and(Article::query()->firstOrFail()->updated_at)->toEqual($before);
+});
+
+it('looks existing rows up per chunk rather than per record', function () {
+    $records = collect(range(1, 1200))->map(fn (int $i) => ['id' => 40000 + $i, 'articleNumber' => "A-{$i}"])->all();
+    // 1200 is a full page at the default page size, so the client asks for a
+    // second page; answer it with nothing.
+    Http::fakeSequence()
+        ->push(['result' => $records], 200)
+        ->push(['result' => []], 200);
+
+    $selects = 0;
+    DB::listen(function (QueryExecuted $query) use (&$selects): void {
+        if (str_starts_with(ltrim($query->sql), 'select') && str_contains($query->sql, 'from "weclapp_articles"')) {
+            $selects++;
+        }
+    });
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    $lookups = $selects;
+
+    expect(Article::query()->count())->toBe(1200)
+        ->and($lookups)->toBe(3);
+});
+
+it('never archives when no record carried an id, which would otherwise match every row', function () {
+    Article::factory()->create(['weclapp_id' => 20001]);
+    Http::fake(['*article*' => Http::response(['result' => [['articleNumber' => 'NO-ID']]], 200)]);
+
+    $this->artisan('weclapp:sync articles')->assertSuccessful();
+
+    expect(Article::query()->count())->toBe(1);
 });
 
 it('maps a quotation, taking version from quotationVersion', function () {
