@@ -15,6 +15,8 @@ class WeclappApiCallCompleted
      * @param array<string, mixed> $response The decoded response body
      * @param bool $suppressed True when the write was intentionally not sent
      *                         (e.g. the writes-enabled toggle short-circuited it)
+     * @param bool $final False when this attempt will be retried — a queued call
+     *                    reports every attempt, and only the last one is its outcome
      */
     public function __construct(
         public string $endpoint,
@@ -23,6 +25,7 @@ class WeclappApiCallCompleted
         public int $statusCode,
         public bool $successful,
         public bool $suppressed = false,
+        public bool $final = true,
     ) {}
 
     public function wasSuccessful(): bool
@@ -33,5 +36,10 @@ class WeclappApiCallCompleted
     public function wasSuppressed(): bool
     {
         return $this->suppressed;
+    }
+
+    public function isFinal(): bool
+    {
+        return $this->final;
     }
 }

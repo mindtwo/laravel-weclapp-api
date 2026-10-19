@@ -23,6 +23,7 @@ class LogWeclappEvent
             'status'     => $event->statusCode,
             'successful' => $event->successful,
             'suppressed' => $event->suppressed,
+            'final'      => $event->final,
         ];
 
         if (config('weclapp-api.logging.include_payload', false)) {

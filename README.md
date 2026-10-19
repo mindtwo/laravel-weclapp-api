@@ -276,7 +276,11 @@ A call whose batch was cancelled is skipped.
 
 Either path emits a `Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted`
 event on success and failure, so consumers can react without threading return
-values through the call stack.
+values through the call stack. A queued call reports every attempt: an event
+whose `final` is `false` is a `429` or `5xx` the job is about to retry, and the
+attempt that ends the call — success, refusal, or budget exhausted — carries
+`final = true`. A listener that throws is reported to the exception handler and
+never fails or re-runs the call it was told about.
 
 ### Low-level client
 

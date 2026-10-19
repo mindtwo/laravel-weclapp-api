@@ -416,6 +416,14 @@ describe('completion events for writes', function () {
         Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->suppressed === true && $e->endpoint === 'article/id/9');
     });
 
+    it('reports a low-level write as final', function () {
+        Http::fake(['*' => Http::response(['id' => 'q-1'], 201)]);
+
+        WeclappClient::post('quotation', ['foo' => 'bar']);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->final === true && $e->isFinal());
+    });
+
     it('reports nothing for a read', function () {
         Http::fakeSequence()->push(['result' => [['id' => '1']]], 200)->push(['result' => []], 200);
 

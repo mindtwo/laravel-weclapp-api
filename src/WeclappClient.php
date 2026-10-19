@@ -416,11 +416,19 @@ class WeclappClient
      * @param array<string, mixed> $body
      * @param (Closure(PendingRequest): PendingRequest)|null $configure e.g. a raw upload body
      * @param bool $retry false lets the queued job retry through the queue only
+     * @param (Closure(Response): bool)|null $isFinal whether a response ends the call; the
+     *                                                queued job answers false for an attempt it will retry
      *
      * @throws ConnectionException
      */
-    public function send(string $method, string $path, array $body = [], ?Closure $configure = null, bool $retry = true): Response
-    {
+    public function send(
+        string $method,
+        string $path,
+        array $body = [],
+        ?Closure $configure = null,
+        bool $retry = true,
+        ?Closure $isFinal = null,
+    ): Response {
         if ($this->isMutating($method) && $this->writesSuppressed()) {
             $this->recordSuppressedWrite($method, $path);
 
@@ -445,13 +453,21 @@ class WeclappClient
             default                => throw new InvalidArgumentException("Unsupported HTTP method: {$method}"),
         };
 
-        WeclappApiCallCompleted::dispatch(
-            $path,
-            $method,
-            $response->json() ?? [],
-            $response->status(),
-            $response->successful(),
-        );
+        // A listener that throws must not turn a sent request into a failed one —
+        // on the queue that would re-run the job and send the write again.
+        try {
+            WeclappApiCallCompleted::dispatch(
+                $path,
+                $method,
+                $response->json() ?? [],
+                $response->status(),
+                $response->successful(),
+                false,
+                $isFinal === null || $isFinal($response),
+            );
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         return $response;
     }

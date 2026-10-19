@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\Jobs\FakeJob;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -148,5 +149,60 @@ describe('retries', function () {
 
         Http::assertNothingSent();
         Event::assertDispatched(WeclappApiCallCompleted::class, fn ($event) => $event->suppressed === true);
+    });
+});
+
+describe('attempt events', function () {
+    it('marks an attempt it will retry as not final, and the one that succeeds as final', function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+        Http::fakeSequence()
+            ->push('', 429, ['Retry-After' => '1'])
+            ->push(['id' => 'q-1'], 201);
+
+        $job = (new WeclappApiCallJob('quotation', 'POST', ['foo' => 'bar']))->withFakeQueueInteractions();
+        $job->handle();
+        $job->handle();
+
+        Event::assertDispatchedTimes(WeclappApiCallCompleted::class, 2);
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 429 && $e->successful === false && $e->final === false);
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 201 && $e->successful === true && $e->final === true);
+    });
+
+    it('marks a refusal as final', function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+        Http::fake(['*' => Http::response(['detail' => 'nope'], 422)]);
+
+        $job = (new WeclappApiCallJob('article/id/9', 'PUT', ['name' => 'New']))->withFakeQueueInteractions();
+        $job->handle();
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 422 && $e->final === true);
+    });
+
+    it('marks a server error as final once the budget has run out', function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+        Http::fake(['*' => Http::response('', 503)]);
+
+        $job = new WeclappApiCallJob('article/id/9', 'PUT', ['name' => 'New']);
+        $job->setJob(exhaustedJob());
+        $job->handle();
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 503 && $e->final === true);
+    });
+
+    it('is neither failed nor re-run by a listener that throws', function () {
+        Http::fake(['*/article/id/9' => Http::response(['id' => '9'], 200)]);
+        Event::listen(WeclappApiCallCompleted::class, function (): void {
+            throw new RuntimeException('listener broke');
+        });
+        $handler = Mockery::mock(ExceptionHandler::class);
+        $handler->shouldReceive('report')->once()->with(Mockery::on(fn (Throwable $e) => $e->getMessage() === 'listener broke'));
+        app()->instance(ExceptionHandler::class, $handler);
+
+        $job = (new WeclappApiCallJob('article/id/9', 'PUT', ['name' => 'New']))->withFakeQueueInteractions();
+        $job->handle();
+
+        $job->assertNotReleased();
+        $job->assertNotFailed();
+        Http::assertSentCount(1);
     });
 });

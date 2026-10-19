@@ -77,7 +77,14 @@ class WeclappApiCallJob implements ShouldQueue
 
         try {
             // One request per attempt; retrying is done through release().
-            $response = $api->send($this->method, $this->endpoint, $this->body, $configure, retry: false);
+            $response = $api->send(
+                $this->method,
+                $this->endpoint,
+                $this->body,
+                $configure,
+                retry: false,
+                isFinal: fn (Response $response): bool => ! $this->willRetry($response),
+            );
         } catch (ConnectionException $e) {
             if ($this->withinBudget()) {
                 $backoff = $this->backoff();
@@ -96,9 +103,7 @@ class WeclappApiCallJob implements ShouldQueue
             return;
         }
 
-        $status = $response->status();
-
-        if (($status === 429 || $status >= 500) && $this->withinBudget()) {
+        if ($this->willRetry($response)) {
             $this->release($this->retryAfterSeconds($response));
 
             return;
@@ -107,7 +112,7 @@ class WeclappApiCallJob implements ShouldQueue
         Log::warning('Weclapp API call failed (terminal)', [
             'endpoint' => $this->endpoint,
             'method'   => $this->method,
-            'status'   => $status,
+            'status'   => $response->status(),
         ]);
 
         $this->fail(WeclappApiCallFailedException::fromResponse($this->endpoint, $this->method, $response));
@@ -142,6 +147,16 @@ class WeclappApiCallJob implements ShouldQueue
             0,
             false,
         );
+    }
+
+    /**
+     * A 429 or 5xx is "not yet", not "failed", while the budget lasts.
+     */
+    private function willRetry(Response $response): bool
+    {
+        return ! $response->successful()
+            && ($response->status() === 429 || $response->status() >= 500)
+            && $this->withinBudget();
     }
 
     /**
