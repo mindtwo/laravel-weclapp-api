@@ -204,8 +204,14 @@ it('generates parseable php for every resource in the spec', function () {
         foreach (['migration', 'model', 'factory'] as $kind) {
             $source = (string) (new ReflectionMethod($command, $kind))->invoke($command, $blueprint);
 
-            expect(fn () => $parser->parse($source))
-                ->not->toThrow(Throwable::class, "{$resource} {$kind} does not parse");
+            // Not `->not->toThrow(..., $label)`: that second argument is a message
+            // filter, and a real parse error never matches it, so the opposite
+            // expectation passed on any output.
+            try {
+                $parser->parse($source);
+            } catch (PhpParser\Error $e) {
+                $this->fail("{$resource} {$kind} does not parse: {$e->getMessage()}");
+            }
 
             $parsed++;
         }
