@@ -18,7 +18,7 @@ Highlights:
   `create()` / `update()` / `delete()` (writes, where the API offers them).
   The generic client still reaches anything else, including nested actions.
 - Writes return a lazy response proxy that runs synchronously **or** hands back an
-  undispatched, rate-limited queue job; every call emits a `WeclappApiCallCompleted`
+  undispatched, rate-limited queue job; every write emits a `WeclappApiCallCompleted`
   event.
 - Publishable `weclapp_*` mirror models/migrations and `weclapp:sync` /
   `weclapp:update` commands.
@@ -99,7 +99,7 @@ MINDTWO_WECLAPP_QUEUE_CONNECTION=         # connection for queued API-call jobs;
 MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE=100 # limit applied to queued API-call jobs
 MINDTWO_WECLAPP_WRITES_ENABLED=true       # see "Write suppression" below
 MINDTWO_WECLAPP_VISIBLE_TAG=              # article tag mirrored as `visible`; empty = every article
-MINDTWO_WECLAPP_LOG_EVENTS=false          # log every WeclappApiCallCompleted event
+MINDTWO_WECLAPP_LOG_EVENTS=false          # log every write's WeclappApiCallCompleted event
 MINDTWO_WECLAPP_LOG_LEVEL=info
 MINDTWO_WECLAPP_LOG_CHANNEL=              # empty = the default log channel
 MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD=false

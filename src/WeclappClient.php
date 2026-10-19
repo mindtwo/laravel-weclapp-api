@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi;
 
+use Closure;
+use GuzzleHttp\Psr7\Response as PsrResponse;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\AccountingTransaction;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Approval;
@@ -167,6 +171,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\Webhook;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WeclappOs;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\WorkScheduleProfile;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Request;
 use Throwable;
 
 class WeclappClient
@@ -401,6 +406,62 @@ class WeclappClient
     }
 
     /**
+     * The one path every write takes, so suppression and the completion event
+     * apply alike to the low-level methods, the proxy and the queued job.
+     * A failed status is returned, not thrown; a connection error propagates.
+     *
+     * @internal Not part of the consumer API; use post(), put(), delete() or
+     *           upload(), or the typed endpoints.
+     *
+     * @param array<string, mixed> $body
+     * @param (Closure(PendingRequest): PendingRequest)|null $configure e.g. a raw upload body
+     * @param bool $retry false lets the queued job retry through the queue only
+     *
+     * @throws ConnectionException
+     */
+    public function send(string $method, string $path, array $body = [], ?Closure $configure = null, bool $retry = true): Response
+    {
+        if ($this->isMutating($method) && $this->writesSuppressed()) {
+            $this->recordSuppressedWrite($method, $path);
+
+            return new Response(new PsrResponse(200, [], (string) json_encode([])));
+        }
+
+        $client = $this->client();
+
+        if (! $retry) {
+            $client = $client->retry(1, 0, throw: false);
+        }
+
+        if ($configure !== null) {
+            $client = $configure($client);
+        }
+
+        $response = match ($method) {
+            Request::METHOD_GET    => $client->get($path),
+            Request::METHOD_POST   => $client->post($path, $body),
+            Request::METHOD_PUT    => $client->put($path, $body),
+            Request::METHOD_DELETE => $client->delete($path),
+            default                => throw new InvalidArgumentException("Unsupported HTTP method: {$method}"),
+        };
+
+        WeclappApiCallCompleted::dispatch(
+            $path,
+            $method,
+            $response->json() ?? [],
+            $response->status(),
+            $response->successful(),
+        );
+
+        return $response;
+    }
+
+    public function isMutating(string $method): bool
+    {
+        return in_array($method, [Request::METHOD_POST, Request::METHOD_PUT, Request::METHOD_DELETE], true);
+    }
+
+    /**
      * Immediately POST data to an endpoint. When $dryRun is true Weclapp
      * validates the payload without persisting it (server-side dry run).
      *
@@ -412,23 +473,11 @@ class WeclappClient
      */
     public function post(string $endpoint, array $data, bool $dryRun = false): array
     {
-        if ($this->writesSuppressed()) {
-            $this->recordSuppressedWrite('POST', $endpoint);
-
-            return [];
-        }
-
-        $path = $this->path($endpoint);
-
-        if ($dryRun) {
-            $path .= '?dryRun=true';
-        }
-
-        $response = $this->client()->post($path, $data);
+        $response = $this->send(Request::METHOD_POST, $this->path($endpoint), $data, $this->dryRun($dryRun));
 
         $response->throw();
 
-        return $response->json();
+        return $response->json() ?? [];
     }
 
     /**
@@ -448,19 +497,7 @@ class WeclappClient
      */
     public function put(string $endpoint, string|int $id, array $data, bool $dryRun = false): array
     {
-        if ($this->writesSuppressed()) {
-            $this->recordSuppressedWrite('PUT', $endpoint);
-
-            return [];
-        }
-
-        $path = $this->recordPath($endpoint, $id);
-
-        if ($dryRun) {
-            $path .= '?dryRun=true';
-        }
-
-        $response = $this->client()->put($path, $data);
+        $response = $this->send(Request::METHOD_PUT, $this->recordPath($endpoint, $id), $data, $this->dryRun($dryRun));
 
         $response->throw();
 
@@ -494,16 +531,13 @@ class WeclappClient
         string $contentType = 'application/octet-stream',
         array $params = [],
     ): ?array {
-        if ($this->writesSuppressed()) {
-            $this->recordSuppressedWrite('POST', $path);
-
-            return [];
-        }
-
-        $response = $this->client()
-            ->withBody($contents, $contentType)
-            ->withQueryParameters([...$params, 'name' => $filename])
-            ->post($this->path($path));
+        $response = $this->send(
+            Request::METHOD_POST,
+            $this->path($path),
+            configure: fn (PendingRequest $client): PendingRequest => $client
+                ->withBody($contents, $contentType)
+                ->withQueryParameters([...$params, 'name' => $filename]),
+        );
 
         if ($response->notFound()) {
             return null;
@@ -521,17 +555,21 @@ class WeclappClient
      */
     public function delete(string $endpoint, string|int $id): bool
     {
-        if ($this->writesSuppressed()) {
-            $this->recordSuppressedWrite('DELETE', $endpoint);
-
-            return true;
-        }
-
-        $response = $this->client()->delete($this->recordPath($endpoint, $id));
+        $response = $this->send(Request::METHOD_DELETE, $this->recordPath($endpoint, $id));
 
         $response->throw();
 
         return $response->successful();
+    }
+
+    /**
+     * @return (Closure(PendingRequest): PendingRequest)|null
+     */
+    private function dryRun(bool $dryRun): ?Closure
+    {
+        return $dryRun
+            ? fn (PendingRequest $client): PendingRequest => $client->withQueryParameters(['dryRun' => 'true'])
+            : null;
     }
 
     /**

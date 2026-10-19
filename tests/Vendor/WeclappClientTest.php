@@ -6,8 +6,10 @@ use Carbon\CarbonInterval;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
+use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
 use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 use Mindtwo\LaravelWeclappApi\WeclappClient as Client;
 
@@ -357,4 +359,74 @@ describe('id cursor safety', function () {
 
         expect(fn () => WeclappClient::get('party'))->toThrow(RuntimeException::class, 'ignored the id cursor');
     });
+});
+
+describe('completion events for writes', function () {
+    beforeEach(function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+    });
+
+    it('reports a sent post with its real status', function () {
+        Http::fake(['*' => Http::response(['id' => 'q-1'], 201)]);
+
+        WeclappClient::post('quotation', ['foo' => 'bar']);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'POST'
+            && $e->endpoint === 'quotation'
+            && $e->statusCode === 201
+            && $e->successful === true
+            && $e->suppressed === false);
+    });
+
+    it('reports a sent put and delete with the record path', function () {
+        Http::fake(['*' => Http::response(['id' => '9'], 200)]);
+
+        WeclappClient::put('article', 9, ['name' => 'x']);
+        WeclappClient::delete('article', 9);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'PUT' && $e->endpoint === 'article/id/9');
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'DELETE' && $e->endpoint === 'article/id/9');
+    });
+
+    it('reports a refused write as unsuccessful before throwing', function () {
+        Http::fake(['*' => Http::response(['detail' => 'nope'], 422)]);
+
+        expect(fn () => WeclappClient::post('quotation', []))->toThrow(RequestException::class);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 422 && $e->successful === false);
+    });
+
+    it('reports an upload', function () {
+        Http::fake(['*' => Http::response(['id' => 'img-1'], 200)]);
+
+        WeclappClient::upload('article/id/9/uploadArticleImage', 'bytes', 'a.png', 'image/png');
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'POST'
+            && $e->endpoint === 'article/id/9/uploadArticleImage'
+            && $e->successful === true);
+    });
+
+    it('names the record path on a suppressed put, like the proxy does', function () {
+        config()->set('weclapp-api.writes_enabled', false);
+        Http::fake();
+
+        WeclappClient::put('article', 9, ['name' => 'x']);
+
+        Http::assertNothingSent();
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->suppressed === true && $e->endpoint === 'article/id/9');
+    });
+
+    it('reports nothing for a read', function () {
+        Http::fakeSequence()->push(['result' => [['id' => '1']]], 200)->push(['result' => []], 200);
+
+        WeclappClient::get('party');
+
+        Event::assertNotDispatched(WeclappApiCallCompleted::class);
+    });
+});
+
+it('returns an empty array for a post whose success has no body', function () {
+    Http::fake(['*' => Http::response('', 204)]);
+
+    expect(WeclappClient::post('salesOrder/id/5/createInvoice', []))->toBe([]);
 });

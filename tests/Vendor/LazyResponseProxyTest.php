@@ -40,6 +40,23 @@ it('emits a failed completion event without throwing on a 4xx', function () {
         && $event->statusCode === 422);
 });
 
+it('emits a failed completion event when the request never gets a response', function () {
+    config()->set('weclapp-api.http.retry_times', 1);
+    config()->set('weclapp-api.http.retry_sleep', 0);
+    Event::fake([WeclappApiCallCompleted::class]);
+    Http::fake(fn () => throw new ConnectionException('timed out'));
+
+    $proxy = WeclappClient::articles()->update(9, ['name' => 'x']);
+
+    expect(fn () => $proxy->status())->toThrow(ConnectionException::class);
+
+    Event::assertDispatched(WeclappApiCallCompleted::class, fn ($event) => $event->method === 'PUT'
+        && $event->endpoint === 'article/id/9'
+        && $event->statusCode === 0
+        && $event->successful === false
+        && $event->response === ['error' => 'timed out']);
+});
+
 it('hands back an undispatched job and does not execute', function () {
     Http::fake();
 

@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Http;
 
-use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
 use Mindtwo\LaravelWeclappApi\Jobs\WeclappApiCallJob;
 use Mindtwo\LaravelWeclappApi\WeclappClient;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\Request;
 use Throwable;
 
 /**
@@ -22,10 +21,8 @@ use Throwable;
  * undispatched WeclappApiCallJob for manual queueing; after that, executing
  * synchronously is no longer allowed.
  *
- * A proxy nobody reads from still sends its request, when it goes out of
- * scope: `WeclappClient::tickets()->delete(9);` as a statement has to delete
- * the ticket, the way the generic `WeclappClient::delete()` would. Only
- * getJob() opts out of that.
+ * A proxy nobody reads from sends its request when it goes out of scope, so
+ * a write used as a plain statement still happens; only getJob() opts out.
  *
  * @mixin Response
  */
@@ -86,45 +83,27 @@ class LazyResponseProxy
             throw new RuntimeException('Cannot execute the API call after getJob() has been called.');
         }
 
-        if ($this->isMutating() && $this->api->writesSuppressed()) {
-            $this->api->recordSuppressedWrite($this->method, $this->endpoint);
-            $this->executed = true;
-
-            return $this->response = new Response(new PsrResponse(200, [], (string) json_encode([])));
-        }
-
-        // Marked before the request goes out: an attempt that throws must not
-        // be made a second time by the destructor.
+        // Before the request, so the destructor never repeats an attempt that threw.
         $this->executed = true;
 
-        $client = $this->api->client();
+        try {
+            return $this->response = $this->api->send($this->method, $this->endpoint, $this->body, $this->configure());
+        } catch (ConnectionException $e) {
+            // send() reports responses; a request that never got one is reported here.
+            WeclappApiCallCompleted::dispatch($this->endpoint, $this->method, ['error' => $e->getMessage()], 0, false);
 
-        if (! empty($this->queryParams)) {
-            $client = $client->withQueryParameters($this->queryParams);
+            throw $e;
         }
-
-        $this->response = match ($this->method) {
-            Request::METHOD_GET    => $client->get($this->endpoint, $this->queryParams),
-            Request::METHOD_POST   => $client->post($this->endpoint, $this->body),
-            Request::METHOD_PUT    => $client->put($this->endpoint, $this->body),
-            Request::METHOD_DELETE => $client->delete($this->endpoint),
-            default                => throw new \InvalidArgumentException("Unsupported HTTP method: {$this->method}"),
-        };
-
-        WeclappApiCallCompleted::dispatch(
-            $this->endpoint,
-            $this->method,
-            $this->response->json() ?? [],
-            $this->response->status(),
-            $this->response->successful(),
-        );
-
-        return $this->response;
     }
 
-    protected function isMutating(): bool
+    /**
+     * @return (\Closure(PendingRequest): PendingRequest)|null
+     */
+    private function configure(): ?\Closure
     {
-        return in_array($this->method, [Request::METHOD_POST, Request::METHOD_PUT, Request::METHOD_DELETE], true);
+        return $this->queryParams === []
+            ? null
+            : fn (PendingRequest $client): PendingRequest => $client->withQueryParameters($this->queryParams);
     }
 
     /**
@@ -153,10 +132,8 @@ class LazyResponseProxy
     }
 
     /**
-     * Send a request nobody asked to read, the way PendingDispatch dispatches
-     * a job nobody chained on. A failure is reported rather than thrown: no
-     * caller is left to catch it, and throwing from a destructor during
-     * shutdown is fatal.
+     * A failure here has no caller left to catch it, and throwing from a
+     * destructor during shutdown is fatal, so it is reported instead.
      */
     public function __destruct()
     {

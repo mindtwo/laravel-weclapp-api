@@ -131,7 +131,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | When enabled, the package logs every WeclappApiCallCompleted event via the
-    | configured channel. Useful for auditing outbound traffic; off by default.
+    | configured channel — one per write, sent or suppressed, from the typed
+    | endpoints, the generic client and the queued job alike. Reads emit
+    | nothing. Useful for auditing outbound writes; off by default.
     |
     */
 
