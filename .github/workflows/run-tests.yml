@@ -5,9 +5,14 @@ on:
     paths:
       - '**.php'
       - '.github/workflows/run-tests.yml'
-      - '../../phpunit.xml'
+      - 'phpunit.xml'
+      - 'testbench.yaml'
       - 'composer.json'
       - 'composer.lock'
+      # Read by the suite: ConfigEnvNamesTest pins .env.example to the config,
+      # and the spec-conformance, mirror and registry tests read the vendored spec.
+      - '.env.example'
+      - 'docs/specifications/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
