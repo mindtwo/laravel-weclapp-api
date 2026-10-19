@@ -58,13 +58,15 @@ final readonly class SyncDefinition
         $attributes = [];
 
         // An absent key is written through as null, for every map. Weclapp omits
-        // empty fields from its JSON rather than sending them as null, so on a full
-        // record "not there" is the only way it can say "cleared". Skipping absent
-        // keys instead kept whatever the mirror held last: a price row whose end
-        // date a user cleared in Weclapp stayed expired in the mirror, and a
-        // consumer went on reading no list price for the article. The same held
-        // for a customer id dropped, a start date removed, a reduction deleted —
-        // every field a user can clear in Weclapp.
+        // empty fields from its JSON unless asked for them with `serializeNulls`,
+        // which the sync does not send, so on a full record "not there" means
+        // "cleared". Skipping absent keys instead kept whatever the mirror held
+        // last: a price row whose end date a user cleared in Weclapp stayed
+        // expired in the mirror, and a consumer went on reading no list price for
+        // the article. The same held for a customer id dropped, a start date
+        // removed, a reduction deleted — every field a user can clear in Weclapp.
+        // The trade: a field Weclapp hides because the token lacks access to
+        // its entity (the README's primarySupplySourceId) is nulled the same way.
         foreach ($this->map as $column => $field) {
             $attributes[$column] = $record->{$field} ?? null;
         }

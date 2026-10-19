@@ -38,7 +38,8 @@ return new class extends Migration
             // reason as the main image: a consumer listing many articles has to know
             // this without an API call each. It decides whether the article can be
             // written at all — Weclapp requires primarySupplySourceId once a
-            // supplySource exists, and does not return that field on a read.
+            // supplySource exists, and hides it from reads when the token lacks
+            // articleSupplySource access.
             $table->unsignedInteger('supply_source_count')->default(0);
             // Derived from the `tags` collection: does the article carry the tag
             // named in `weclapp-api.visible_tag`? Not to be confused with `active`

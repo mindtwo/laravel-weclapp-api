@@ -372,6 +372,10 @@ php artisan weclapp:sync
 php artisan weclapp:update articles --since="2026-01-01 00:00:00"
 ```
 
+`weclapp:update` keeps no record of its last run: without `--since` it asks for
+the past 24 hours, so a run that was skipped or failed leaves a gap that only
+the next full `weclapp:sync` closes. Schedule one periodically.
+
 `weclapp:update` writes only the records Weclapp reports as modified, so a
 value derived in the mirror from configuration — the article `visible` flag
 from `MINDTWO_WECLAPP_VISIBLE_TAG` — is only recomputed for those. After

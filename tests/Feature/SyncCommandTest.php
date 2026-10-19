@@ -164,7 +164,7 @@ it('never archives when no record carried an id, which would otherwise match eve
     expect(Article::query()->count())->toBe(1);
 });
 
-it('maps a quotation, taking version from quotationVersion', function () {
+it('maps a quotation, keeping the revision apart from the lock version', function () {
     Http::fake(['*quotation*' => Http::response(['result' => [[
         'id'               => 40001,
         'quotationNumber'  => 'QU-10001',
@@ -172,6 +172,7 @@ it('maps a quotation, taking version from quotationVersion', function () {
         'grossAmount'      => 29750.00,
         'netAmount'        => 25000.00,
         'quotationVersion' => 3,
+        'version'          => '7',
         'status'           => 'OPEN',
     ]]], 200)]);
 
@@ -181,7 +182,8 @@ it('maps a quotation, taking version from quotationVersion', function () {
 
     expect($quotation->weclapp_id)->toBe(40001)
         ->and($quotation->quotation_number)->toBe('QU-10001')
-        ->and($quotation->version)->toBe(3);
+        ->and($quotation->quotation_version)->toBe(3)
+        ->and($quotation->version)->toBe(7);
 });
 
 it('flattens the price-relevant reductionAdditions entry onto the price row', function () {
@@ -496,9 +498,9 @@ it('flags the configured tag as visible, and keeps mirroring the articles withou
 it('flips visible off when the tag is removed, without losing the mirror row', function () {
     // One record page and the empty page that ends the id cursor, per sync.
     Http::fake(['*article*' => Http::sequence()
-        ->push(['result' => [['id' => 20001, 'article_number' => 'A-1', 'tags' => ['Cloud']]]], 200)
+        ->push(['result' => [['id' => 20001, 'articleNumber' => 'A-1', 'tags' => ['Cloud']]]], 200)
         ->push(['result' => []], 200)
-        ->push(['result' => [['id' => 20001, 'article_number' => 'A-1', 'tags' => []]]], 200)
+        ->push(['result' => [['id' => 20001, 'articleNumber' => 'A-1', 'tags' => []]]], 200)
         ->push(['result' => []], 200)]);
 
     $this->artisan('weclapp:sync articles')->assertSuccessful();

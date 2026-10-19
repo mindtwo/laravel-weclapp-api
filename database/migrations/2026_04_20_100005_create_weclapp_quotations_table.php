@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('net_amount', 12, 2)->nullable();
             $table->string('quotation_number')->nullable();
             $table->string('status')->nullable();
+            $table->integer('quotation_version')->nullable();
             $table->integer('version')->nullable();
             $table->timestamps();
             // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
