@@ -417,23 +417,36 @@ scope a query to one role.
 > (live-confirmed). Because it is undocumented, Weclapp gives no compatibility
 > guarantee for it.
 
-### What the sync layer does not cover
+### What the sync layer covers, and what it leaves to you
 
-A `SyncDefinition` maps the flat scalar fields of one Weclapp record into one row
-of one mirror table. That is the whole model, and it is deliberate. The following
-are **left to the consuming application**:
+A `SyncDefinition` copies one Weclapp record into one row of one mirror table:
+scalar fields through its `map`, epoch-millisecond dates through `dates`, and a
+single value from inside nested data through a `derive` closure. The shipped
+definitions derive:
 
-- **Nested collections** — a party's addresses and contacts, an order's items,
-  bank accounts. These stay in the API response; the mirror does not unpack them.
+- `articles`: `main_image_id` / `main_image_filename` (the flagged entry of
+  `articleImages`), `supply_source_count` (the size of `supplySources`), and
+  `visible` (whether `tags` holds `MINDTWO_WECLAPP_VISIBLE_TAG`);
+- `article-prices`: `reduction_type` / `reduction_value` (the first entry of
+  `reductionAdditions`; a second one is logged, not mirrored);
+- `parties`: `is_customer` / `is_supplier` (Weclapp's role flags).
+
+**Reconciliation.** A full `weclapp:sync` soft-deletes the mirror rows Weclapp
+no longer returns, for every entity, and reports how many it archived. It never
+archives on `weclapp:update`, on a filtered run, or when the response carried no
+record ids — each of those would make live rows look gone. Archived rows are
+hidden from default Eloquent queries; read them with `withTrashed()`. A record
+that comes back is restored onto its old row.
+
+Left to the consuming application:
+
+- **Whole nested collections** — a party's addresses and contacts, an order's
+  items, bank accounts. Only the single values listed above are flattened.
 - **Fan-out to several models from one response** — a definition targets exactly
   one model.
 - **Cross-entity resolution** — resolving a foreign key by looking up another
   local table before saving.
 - **Domain side effects** — a mirror row is passive data, not application state.
-- **Derived data** — anything computed from Weclapp records rather than returned
-  by Weclapp.
-- **Reconciliation** — the sync is additive and upserts by weclapp id. It does not
-  prune rows that were deleted or archived remotely.
 
 If you need any of these, use the client and typed endpoints directly and project
 the response into your own schema. The mirror tables are for consumers that want a

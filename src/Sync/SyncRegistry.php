@@ -17,8 +17,9 @@ use Mindtwo\LaravelWeclappApi\Models\User;
 
 /**
  * The set of Weclapp entities the package can sync directly from an endpoint
- * into a mirror table. Derived data (amounts, reports) and nested collections
- * (addresses, contacts, bank accounts) are intentionally left to the consumer.
+ * into a mirror table. Whole nested collections (addresses, contacts, bank
+ * accounts) are left to the consumer; a single value from inside one is
+ * flattened through `derive` (the main image, the price reduction).
  *
  * Field maps validated against docs/specifications/weclapp-openapi_v2.json and a
  * live read of every endpoint below (500-record sample where available); the

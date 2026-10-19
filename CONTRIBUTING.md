@@ -452,9 +452,11 @@ fields; all 967 records show 16. The four that only appear sometimes include
 is still worth doing, but for a different question: which fields this tenant
 actually populates, and how densely.
 
-Nested collections (a party's addresses, an invoice's items, `reductionAdditions`)
-are deliberately out of scope for `SyncDefinition`, which maps flat scalars of one
-record into one row. Skip them and leave them to the consumer.
+Whole nested collections (a party's addresses, an invoice's items) stay out of
+scope for `SyncDefinition`, which writes one record into one row. A single value
+from inside one is flattened with a `derive` closure — `articles` takes the main
+image out of `articleImages`, `article-prices` the reduction out of
+`reductionAdditions`. Leave the rest to the consumer.
 
 ## Testing
 
