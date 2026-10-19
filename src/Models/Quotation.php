@@ -58,9 +58,9 @@ class Quotation extends Model
     {
         return [
             'customer_id'       => 'integer',
-            'gross_amount'      => 'decimal:2',
+            'gross_amount'      => 'decimal:5',
             'last_modified'     => 'datetime',
-            'net_amount'        => 'decimal:2',
+            'net_amount'        => 'decimal:5',
             'status_id'         => 'integer',
             'quotation_version' => 'integer',
             'version'           => 'integer',

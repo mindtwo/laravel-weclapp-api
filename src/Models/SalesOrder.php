@@ -77,9 +77,9 @@ class SalesOrder extends Model
     {
         return [
             'customer_id'         => 'integer',
-            'gross_amount'        => 'decimal:2',
+            'gross_amount'        => 'decimal:5',
             'last_modified'       => 'datetime',
-            'net_amount'          => 'decimal:2',
+            'net_amount'          => 'decimal:5',
             'order_date'          => 'datetime',
             'pricing_date'        => 'datetime',
             'quotation_id'        => 'integer',

@@ -800,7 +800,7 @@ describe('mirrors every remaining entity', function () {
             ->and($order->customer_id)->toBe(12345)
             ->and($order->quotation_id)->toBe(40001)
             ->and($order->order_number)->toBe('SO-10001')
-            ->and($order->net_amount)->toEqual('100.00')
+            ->and($order->net_amount)->toEqual('100.00000')
             ->and($order->order_date?->toIso8601ZuluString())->toBe('2026-10-12T21:59:59Z')
             ->and($order->service_period_from)->not->toBeNull()
             ->and($order->service_period_to)->toBeNull();

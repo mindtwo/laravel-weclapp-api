@@ -16,9 +16,11 @@ return new class extends Migration
             $table->unsignedBigInteger('quotation_id')->nullable();
             $table->unsignedBigInteger('responsible_user_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->unique();
-            $table->decimal('gross_amount', 12, 2)->nullable();
+            // Amounts take the spec's decimal shape: up to 13 integer and 5
+            // fractional digits.
+            $table->decimal('gross_amount', 18, 5)->nullable();
             $table->datetime('last_modified')->nullable();
-            $table->decimal('net_amount', 12, 2)->nullable();
+            $table->decimal('net_amount', 18, 5)->nullable();
             $table->datetime('order_date')->nullable();
             $table->string('order_number')->nullable();
             $table->datetime('pricing_date')->nullable();

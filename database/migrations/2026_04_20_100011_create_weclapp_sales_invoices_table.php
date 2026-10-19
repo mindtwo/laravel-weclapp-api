@@ -21,11 +21,13 @@ return new class extends Migration
             $table->unsignedBigInteger('term_of_payment_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->unique();
             $table->text('description')->nullable();
-            $table->decimal('gross_amount', 12, 2)->nullable();
+            // Amounts take the spec's decimal shape: up to 13 integer and 5
+            // fractional digits.
+            $table->decimal('gross_amount', 18, 5)->nullable();
             $table->datetime('invoice_date')->nullable();
             $table->string('invoice_number')->nullable();
             $table->datetime('last_modified')->nullable();
-            $table->decimal('net_amount', 12, 2)->nullable();
+            $table->decimal('net_amount', 18, 5)->nullable();
             $table->boolean('paid')->nullable();
             $table->string('payment_status')->nullable();
             $table->datetime('pricing_date')->nullable();

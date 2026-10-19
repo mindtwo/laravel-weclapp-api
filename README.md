@@ -521,6 +521,10 @@ table published from an earlier build lacks:
   `primary_supply_source_id`, `main_image_id`, `main_image_filename`;
 - `weclapp_article_prices`: `reduction_type`, `reduction_value`, and amounts
   as `decimal(18,5)` instead of `decimal(12,4)`;
+- `gross_amount`/`net_amount` on `weclapp_quotations`, `weclapp_sales_orders`
+  and `weclapp_sales_invoices` as `decimal(18,5)` instead of `decimal(12,2)`,
+  cast to five places (`100.00000`) — format them for display, e.g. with
+  `Number::currency()`;
 - `weclapp_parties`: `is_customer`, `is_supplier`;
 - `weclapp_article_categories`: `last_modified`;
 - `weclapp_sales_invoices.description` as `text` instead of `varchar(255)`;
