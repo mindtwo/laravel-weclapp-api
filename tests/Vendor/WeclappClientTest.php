@@ -171,6 +171,15 @@ it('deletes an arbitrary record without a typed endpoint class', function () {
         && $request->method() === 'DELETE');
 });
 
+it('appends the dryRun flag to a delete when requested', function () {
+    Http::fake(['*' => Http::response('', 204)]);
+
+    WeclappClient::delete('ticket', 9, dryRun: true);
+
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/ticket/id/9?dryRun=true')
+        && $request->method() === 'DELETE');
+});
+
 it('throws when a generic write fails', function () {
     Http::fake(['*' => Http::response(['error' => 'nope'], 422)]);
 

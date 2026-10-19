@@ -248,10 +248,11 @@ assume that being able to add implies being able to undo.
 sales channel is `400 validation failed`, not a permission problem. The same payload
 on a free scale, or scoped to a customer, is accepted.
 
-**`dryRun` genuinely does not persist** — verified by comparing the record byte-for-byte
-before and after — but it is **not available everywhere**. It exists on `PUT`/`DELETE`
-for `article` and `party`; `uploadArticleImage` has no dry run at all, so an image
-write cannot be validated before it happens.
+**`dryRun` genuinely does not persist** — verified on `article` and `party` by comparing
+the record byte-for-byte before and after — but it is **not available everywhere**. The
+spec documents it on every generic create, update and delete (`POST /{resource}`,
+`PUT`/`DELETE /{resource}/id/{id}`), and on none of the action paths: `uploadArticleImage`
+has no dry run at all, so an image write cannot be validated before it happens.
 
 **`/system/permissions` is not a reliable account of what a token may do.** It returns
 the catalogue of right names and disagrees with observed behaviour in both directions —
@@ -351,16 +352,17 @@ WeclappClient::upload(
 );
 ```
 
-`put()` also takes a `dryRun` flag, which asks Weclapp to validate the payload
-without persisting it:
+`post()`, `put()` and `delete()` take a `dryRun` flag, which asks Weclapp to
+validate the write without persisting it:
 
 ```php
 WeclappClient::put('article', $id, $payload, dryRun: true);
+WeclappClient::delete('article', $id, dryRun: true);
 ```
 
-Note that write suppression covers a dry run too — it is still a PUT against the
-live tenant — so check `writesSuppressed()` rather than reading meaning into the
-empty array it returns.
+Note that write suppression covers a dry run too — it is still a write against
+the live tenant — so check `writesSuppressed()` rather than reading meaning into
+the empty response it returns.
 
 ### Write suppression
 

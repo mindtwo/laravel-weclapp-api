@@ -550,7 +550,7 @@ class WeclappClient
      */
     public function post(string $endpoint, array $data, bool $dryRun = false): array
     {
-        $response = $this->send(Request::METHOD_POST, $this->path($endpoint), $data, $this->dryRun($dryRun));
+        $response = $this->send(Request::METHOD_POST, $this->path($endpoint), $data, $this->writeQuery($dryRun, false));
 
         $response->throw();
 
@@ -578,7 +578,7 @@ class WeclappClient
      */
     public function put(string $endpoint, string|int $id, array $data, bool $dryRun = false, bool $partial = false): array
     {
-        $response = $this->send(Request::METHOD_PUT, $this->recordPath($endpoint, $id), $data, $this->putQuery($dryRun, $partial));
+        $response = $this->send(Request::METHOD_PUT, $this->recordPath($endpoint, $id), $data, $this->writeQuery($dryRun, $partial));
 
         $response->throw();
 
@@ -630,25 +630,18 @@ class WeclappClient
     }
 
     /**
-     * Immediately DELETE a record.
+     * Immediately DELETE a record. When $dryRun is true Weclapp checks whether
+     * the record could be deleted without deleting it.
      *
      * @throws RequestException
      */
-    public function delete(string $endpoint, string|int $id): bool
+    public function delete(string $endpoint, string|int $id, bool $dryRun = false): bool
     {
-        $response = $this->send(Request::METHOD_DELETE, $this->recordPath($endpoint, $id));
+        $response = $this->send(Request::METHOD_DELETE, $this->recordPath($endpoint, $id), configure: $this->writeQuery($dryRun, false));
 
         $response->throw();
 
         return $response->successful();
-    }
-
-    /**
-     * @return (Closure(PendingRequest): PendingRequest)|null
-     */
-    private function dryRun(bool $dryRun): ?Closure
-    {
-        return $this->putQuery($dryRun, false);
     }
 
     /**
@@ -657,7 +650,7 @@ class WeclappClient
      *
      * @return (Closure(PendingRequest): PendingRequest)|null
      */
-    private function putQuery(bool $dryRun, bool $partial): ?Closure
+    private function writeQuery(bool $dryRun, bool $partial): ?Closure
     {
         $query = array_filter(['dryRun' => $dryRun, 'ignoreMissingProperties' => $partial]);
 
