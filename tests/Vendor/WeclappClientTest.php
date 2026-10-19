@@ -79,18 +79,72 @@ it('keeps reading past a short page, since a resource may cap the page size belo
     Http::assertSentCount(3);
 });
 
-it('pages by offset when the caller orders the result itself', function () {
+it('pages by offset when the caller orders the result itself, until an empty page', function () {
     Http::fakeSequence()
         ->push(['result' => [['id' => '9'], ['id' => '8']]], 200)
-        ->push(['result' => [['id' => '7']]], 200);
+        ->push(['result' => [['id' => '7']]], 200)
+        ->push(['result' => [['id' => '6']]], 200)
+        ->push(['result' => []], 200);
 
-    expect(WeclappClient::get('party', ['sort' => '-id']))->toHaveCount(3);
+    // A short page is not the end: a resource may cap its pages below the configured size.
+    expect(WeclappClient::get('party', ['sort' => '-id']))->toHaveCount(4);
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(4);
     Http::assertSentInOrder([
         fn ($request) => query($request)['sort'] === '-id' && query($request)['page'] === '1' && ! isset(query($request)['id-gt']),
         fn ($request) => query($request)['sort'] === '-id' && query($request)['page'] === '2' && ! isset(query($request)['id-gt']),
+        fn ($request) => query($request)['page'] === '3',
+        fn ($request) => query($request)['page'] === '4',
     ]);
+});
+
+it('pages by offset when the caller orders with orderBy, sending no cursor sort', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '3'], ['id' => '1']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('article', ['orderBy' => 'articleNumber']))->toHaveCount(2);
+
+    Http::assertSent(fn ($request) => query($request)['orderBy'] === 'articleNumber'
+        && ! isset(query($request)['sort'])
+        && ! isset(query($request)['id-gt']));
+});
+
+it('fails loudly when an offset page repeats, instead of looping forever', function () {
+    Http::fake(['*' => Http::response(['result' => [['id' => '9'], ['id' => '8']]], 200)]);
+
+    expect(fn () => WeclappClient::get('party', ['sort' => '-id']))
+        ->toThrow(UnexpectedValueException::class, 'ignored the page parameter');
+
+    Http::assertSentCount(2);
+});
+
+it('adds id to a partial response so the cursor can move on', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '1', 'name' => 'a'], ['id' => '2', 'name' => 'b']]], 200)
+        ->push(['result' => [['id' => '3', 'name' => 'c']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('article', ['properties' => 'name']))->toHaveCount(3);
+
+    Http::assertSent(fn ($request) => query($request)['properties'] === 'name,id');
+});
+
+it('keeps a properties list that already names id', function () {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('article', ['properties' => 'id,name']);
+
+    Http::assertSent(fn ($request) => query($request)['properties'] === 'id,name');
+});
+
+it('refuses an offset without a page, since every page would skip it', function () {
+    Http::fake();
+
+    expect(fn () => WeclappClient::get('article', ['offset' => 50]))
+        ->toThrow(InvalidArgumentException::class, 'pass `page`');
+
+    Http::assertNothingSent();
 });
 
 it('pages by offset when the caller filters on the id', function () {
@@ -128,10 +182,10 @@ it('fetches the next page lazily, only once the records before it are consumed',
     Http::assertSentCount(3);
 });
 
-it('stops after a page whose records carry no id rather than re-reading it forever', function () {
+it('fails on a page whose records carry no id rather than returning it as the whole collection', function () {
     Http::fake(['*' => Http::response(['result' => [['name' => 'no id']]], 200)]);
 
-    expect(WeclappClient::get('party'))->toHaveCount(1);
+    expect(fn () => WeclappClient::get('party'))->toThrow(UnexpectedValueException::class, 'without an id');
 
     Http::assertSentCount(1);
 });

@@ -161,7 +161,9 @@ it('never archives when no record carried an id, which would otherwise match eve
     Article::factory()->create(['weclapp_id' => 20001]);
     Http::fake(['*article*' => Http::response(['result' => [['articleNumber' => 'NO-ID']]], 200)]);
 
-    $this->artisan('weclapp:sync articles')->assertSuccessful();
+    $this->artisan('weclapp:sync articles')
+        ->expectsOutputToContain('without an id')
+        ->assertFailed();
 
     expect(Article::query()->count())->toBe(1);
 });

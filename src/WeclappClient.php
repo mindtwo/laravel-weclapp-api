@@ -267,7 +267,8 @@ class WeclappClient
      * @param array<string, mixed> $params
      *
      * @throws RequestException
-     * @throws UnexpectedValueException when Weclapp ignores the id cursor
+     * @throws InvalidArgumentException for an `offset` without `page`
+     * @throws UnexpectedValueException when Weclapp ignores the cursor or `page`, or returns records without an id
      *
      * @return Collection<int, object>
      */
@@ -302,8 +303,9 @@ class WeclappClient
      * one, because a resource whose cap is lower than the configured page size
      * answers every page short.
      *
-     * A caller that orders the result itself, or filters on the id, gets plain
-     * offset pages: a second sort or id filter would contradict its own.
+     * A caller that orders the result itself (`sort` or `orderBy`), or filters on
+     * the id, gets plain offset pages: a second sort or id filter would contradict
+     * its own. `properties` always gains `id`, which paging needs.
      *
      * A failed page throws when the walk reaches it, after the records before it
      * have been handed out; a caller acting on the whole set (as reconciliation
@@ -311,12 +313,25 @@ class WeclappClient
      *
      * @param array<string, mixed> $params
      *
-     * @throws RequestException
+     * @throws InvalidArgumentException for an `offset`, which addresses a single page
      *
-     * @return LazyCollection<int, object>
+     * @return LazyCollection<int, object> iterating it throws RequestException on a failed
+     *                                     page, and UnexpectedValueException when Weclapp ignores
+     *                                     the cursor or `page`, or returns records without an id
      */
     public function lazy(string $endpoint, array $params = []): LazyCollection
     {
+        // Sent with every page, an offset would skip records on each of them.
+        if (isset($params['offset'])) {
+            throw new InvalidArgumentException('`offset` only applies to a single page; pass `page` to get() instead.');
+        }
+
+        // Both loops need the id to move on, so a partial response always carries it.
+        if (isset($params['properties']) && is_string($params['properties'])
+            && ! in_array('id', explode(',', $params['properties']), true)) {
+            $params['properties'] .= ',id';
+        }
+
         return LazyCollection::make(fn (): Generator => $this->walk($endpoint, $params));
     }
 
@@ -329,9 +344,11 @@ class WeclappClient
     {
         // Weclapp caps pageSize at 1000; anything below 1 would never end the loop.
         $pageSize = max(1, min(1000, (int) config('weclapp-api.page_size', 1000)));
-        $keyset = ! isset($params['sort']) && ! $this->filtersOnId($params);
+        // Weclapp rejects `sort` together with `orderBy`, so either one opts out of the cursor.
+        $keyset = ! isset($params['sort']) && ! isset($params['orderBy']) && ! $this->filtersOnId($params);
         $page = 1;
         $lastId = null;
+        $previousFirstId = null;
 
         do {
             $query = array_merge($params, ['page' => $page, 'pageSize' => $pageSize]);
@@ -373,22 +390,29 @@ class WeclappClient
                 break;
             }
 
+            // Offset pages end on an empty page too, so a page that repeats the
+            // previous one means `page` was ignored and the loop would not end.
+            $firstId = $batch === [] ? null : ($batch[0]->id ?? null);
+
+            if (! $keyset && $firstId !== null && $firstId === $previousFirstId) {
+                throw new UnexpectedValueException(sprintf('Weclapp ignored the page parameter on /%s.', $endpoint));
+            }
+
+            // A record without an id cannot move the cursor; handing on what was
+            // read so far would look like the whole collection.
+            if ($keyset && $batch !== [] && $pageLastId === null) {
+                throw new UnexpectedValueException(sprintf('Weclapp returned records without an id on /%s.', $endpoint));
+            }
+
             // Not `yield from`: that reuses each page's own keys, which restart at 0.
             foreach ($batch as $record) {
                 yield $record;
             }
 
             $page++;
-
-            // A record without an id cannot anchor the cursor; stop here so a
-            // malformed envelope ends the loop instead of re-reading the first
-            // page forever.
-            if ($keyset && $batch !== [] && $pageLastId === null) {
-                break;
-            }
-
             $lastId = $pageLastId ?? $lastId;
-        } while ($batch !== [] && ($keyset || count($batch) >= $pageSize));
+            $previousFirstId = $firstId;
+        } while ($batch !== []);
     }
 
     /**
