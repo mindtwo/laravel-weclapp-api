@@ -131,9 +131,11 @@ return [
     |--------------------------------------------------------------------------
     |
     | When enabled, the package logs every WeclappApiCallCompleted event via the
-    | configured channel — one per write, sent or suppressed, from the typed
-    | endpoints, the generic client and the queued job alike. Reads emit
-    | nothing. Useful for auditing outbound writes; off by default.
+    | configured channel — one per answered or suppressed write, from the typed
+    | endpoints, the generic client and the queued job alike. A write that gets
+    | no answer is only logged from the proxy or a job that gives up (see the
+    | README). Reads emit nothing. Useful for auditing outbound writes; off by
+    | default.
     |
     */
 

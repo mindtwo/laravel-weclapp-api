@@ -19,8 +19,8 @@ Highlights:
   `create()` / `update()` / `delete()` (writes, where the API offers them).
   The generic client still reaches anything else, including nested actions.
 - Writes return a lazy response proxy that runs synchronously **or** hands back an
-  undispatched, rate-limited queue job; every write emits a `WeclappApiCallCompleted`
-  event.
+  undispatched, rate-limited queue job; every answered or suppressed write emits a
+  `WeclappApiCallCompleted` event.
 - Publishable `weclapp_*` mirror models/migrations and `weclapp:sync` /
   `weclapp:update` commands.
 - A `writes_enabled` toggle that suppresses (and logs) mutating requests in
@@ -294,12 +294,20 @@ again could create a second one. A refusal (`4xx`) fails at once. A call whose
 batch was cancelled is skipped.
 
 Either path emits a `Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted`
-event on success and failure, so consumers can react without threading return
-values through the call stack. A queued call reports every attempt: an event
-whose `final` is `false` is a `429` or `5xx` the job is about to retry, and the
-attempt that ends the call — success, refusal, or budget exhausted — carries
-`final = true`. A listener that throws is reported to the exception handler and
-never fails or re-runs the call it was told about.
+event for every answer Weclapp sends, success or failure, so consumers can react
+without threading return values through the call stack. A queued call reports
+every answered attempt: an event whose `final` is `false` is a `429` or `5xx`
+the job is about to retry, and the attempt that ends the call — success,
+refusal, or budget exhausted — carries `final = true`.
+
+A request that gets no answer at all (timeout, dropped connection) throws a
+`ConnectionException`. It is reported as an event with status `0` only by the
+proxy and by a queued job once it gives up; the low-level methods and a job
+attempt it retries emit nothing for it.
+
+A listener that throws on an answered request is reported to the exception
+handler and never fails or re-runs the call. Listeners on a suppressed write or
+a status-`0` event are not shielded that way, so keep them from throwing.
 
 ### Low-level client
 
