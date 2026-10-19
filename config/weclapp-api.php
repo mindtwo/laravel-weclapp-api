@@ -84,6 +84,10 @@ return [
     | application. The article mirror keeps it as the `visible` boolean. Leave
     | empty to treat every article as visible.
     |
+    | `visible` is computed when a row is written. After changing this value
+    | run a full `weclapp:sync articles`: `weclapp:update` only revisits the
+    | articles Weclapp reports as modified, so the rest would keep the old flag.
+    |
     */
 
     'visible_tag' => env('MINDTWO_WECLAPP_VISIBLE_TAG'),

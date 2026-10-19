@@ -108,6 +108,11 @@ MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD=false
 The values shown are the defaults. Omit a line to keep its default; a blank
 value (`KEY=`) is treated like an omitted one.
 
+`MINDTWO_WECLAPP_VISIBLE_TAG` is evaluated when an article row is written, so
+after changing it run a full `weclapp:sync articles` — `weclapp:update` only
+revisits articles Weclapp reports as modified and would leave the rest with
+the old `visible` flag.
+
 ## Usage
 
 ```php
@@ -340,6 +345,11 @@ php artisan weclapp:sync
 # Incremental sync of records changed since a time (default: 24h ago)
 php artisan weclapp:update articles --since="2026-01-01 00:00:00"
 ```
+
+`weclapp:update` writes only the records Weclapp reports as modified, so a
+value derived in the mirror from configuration — the article `visible` flag
+from `MINDTWO_WECLAPP_VISIBLE_TAG` — is only recomputed for those. After
+changing the tag, run a full `weclapp:sync articles`.
 
 Without an entity argument both commands run every supported entity in turn.
 Entities whose table you did not publish are skipped, and an entity Weclapp
