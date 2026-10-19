@@ -400,13 +400,20 @@ is both faster and more accurate than hand-writing it:
 php artisan weclapp:make-mirror opportunity              # migration + model + factory
 php artisan weclapp:make-mirror contract --dry           # list what would be written
 php artisan weclapp:make-mirror ticket --only=id,subject,ticketNumber
-php artisan weclapp:make-mirror articlePrice --force     # regenerate a shipped mirror in place
 ```
 
 The command is only registered when `docs/specifications` is present, i.e. in
 a git checkout; a Composer install has no spec and no generator. It refuses to
 touch a file that already exists unless `--force` is given, and checks all
 three targets before writing any of them.
+
+A shipped mirror's migration, model and factory carry hand-written parts the
+spec cannot produce — derived columns such as `reduction_type` or
+`is_customer`, relations, factory states, comments — and `--force` replaces
+them with the raw scaffold. Never commit a forced run as it is. To bring a
+shipped mirror up to a new spec, force it on a clean working tree, keep only
+the spec-driven hunks with `git add -p`, and discard the rest with
+`git checkout -- <file>`.
 
 It resolves the `allOf` chain, maps types (`format: timestamp` → `datetime` and
 into `dates`; `format: decimal` → `decimal`; `id`, fields the spec marks as an
