@@ -508,7 +508,8 @@ ticket(s):
   into the published `CHANGELOG.md`. External contributors should reference
   GitHub issues instead (`Fixes #123`).
 
-GrumPHP validates the subject on commit.
+commitlint validates the subject on commit (`.husky/commit-msg`): conventional
+format, at most 100 characters. GrumPHP runs the linter, not the message check.
 
 ### Pull Request Process
 

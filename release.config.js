@@ -103,10 +103,14 @@ module.exports = {
                     "noteKeywords" : [
                         "BREAKING CHANGE",
                         "BREAKING CHANGES",
+                        "BREAKING-CHANGE",
                         "BREAKING"
                     ]
                 },
-                "preset" : "angular",
+                // conventionalcommits, like the notes generator below: the angular
+                // preset's header pattern has no "!" and would give a
+                // `feat(x)!: …` commit no type at all.
+                "preset" : "conventionalcommits",
                 "ignoreCommits" : (commit) => {
                     return commit.merge && commit.merge.includes("main");
                 }
@@ -119,6 +123,7 @@ module.exports = {
                     "noteKeywords" : [
                         "BREAKING CHANGE",
                         "BREAKING CHANGES",
+                        "BREAKING-CHANGE",
                         "BREAKING"
                     ]
                 },

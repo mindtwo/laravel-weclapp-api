@@ -21,7 +21,7 @@ ticket(s):
 - `%id%` is the ClickUp task id taken from the current branch name.
 - The link text uses the lowercase prefix `sd-%id%`; the URL path uses the uppercase `SD-%id%`. The team/workspace segment `30379192` is fixed — never change it.
 - The label is `ticket(s):` (plural-aware): if a branch legitimately references more than one ticket, add one indented `- [...]` line per ticket. Normally there is exactly one.
-- **Ticket information never appears in the subject line, in any commit.** The block goes in the commit **body**; the subject stays a valid Conventional-Commit line (`type(scope): summary`, ≤120 chars, so the GrumPHP commit-msg hook passes). This holds for squashed commits too — see below.
+- **Ticket information never appears in the subject line, in any commit.** The block goes in the commit **body**; the subject stays a valid Conventional-Commit line (`type(scope): summary`, ≤100 chars, so the commitlint commit-msg hook passes). This holds for squashed commits too — see below.
 
 ## Deriving the ticket id from the branch
 
