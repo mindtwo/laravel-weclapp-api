@@ -509,6 +509,14 @@ otherwise re-publishing swaps in the new names and leaves your old `.env`
 unread. `tests/Vendor/ConfigEnvNamesTest.php` pins the package config and
 `.env.example` to each other.
 
+### Migrations are published, not loaded automatically
+
+Early builds loaded the mirror migrations from the package itself. They are now
+published like any other package migrations, so an application on such a build
+has no migration files of its own after the update. Publish them with
+`php artisan vendor:publish --tag=weclapp-api-migrations`, or one table at a
+time with the per-entity tags listed under [Installation](#installation).
+
 ### Mirror tables changed in place
 
 The create migrations were edited rather than extended while unreleased. A
@@ -520,11 +528,16 @@ table published from an earlier build lacks:
 - `weclapp_articles`: `visible`, `long_text`, `supply_source_count`,
   `primary_supply_source_id`, `main_image_id`, `main_image_filename`;
 - `weclapp_article_prices`: `reduction_type`, `reduction_value`, and amounts
-  as `decimal(18,5)` instead of `decimal(12,4)`;
+  as `decimal(18,5)` (`price` and `price_scale_value` were `decimal(12,4)`,
+  `reduction_value` was `decimal(8,4)`);
 - `gross_amount`/`net_amount` on `weclapp_quotations`, `weclapp_sales_orders`
   and `weclapp_sales_invoices` as `decimal(18,5)` instead of `decimal(12,2)`,
   cast to five places (`100.00000`) — format them for display, e.g. with
   `Number::currency()`;
+- `weclapp_quotations`: `quotation_version`, the quotation's revision. `version`
+  used to hold that revision and now holds Weclapp's lock counter, as on every
+  other mirror — code reading `Quotation::$version` as the revision must move
+  to `quotation_version`;
 - `weclapp_parties`: `is_customer`, `is_supplier`;
 - `weclapp_article_categories`: `last_modified`;
 - `weclapp_sales_invoices.description` as `text` instead of `varchar(255)`;
@@ -532,10 +545,19 @@ table published from an earlier build lacks:
   `weclapp_reports` tables with their `Amount` and `Report` models and
   `Quotation::report()` — none of them was a Weclapp resource.
 
-A mirror holds no data of its own, so the straightforward path is to drop the
-`weclapp_*` tables, delete the published migrations, re-publish, migrate and
-run a full `weclapp:sync`. Writing alter migrations by hand works too; the list
-above is complete.
+A mirror holds no data of its own, so the straightforward path is to rebuild
+the tables. The published files keep the package's names, which an earlier
+build may already have recorded as run, so clear those records too — otherwise
+`migrate` skips the re-published files and creates nothing:
+
+1. drop the `weclapp_*` tables;
+2. delete their rows from the `migrations` table, e.g.
+   `DB::table('migrations')->where('migration', 'like', '%create_weclapp_%')->delete();`;
+3. delete any previously published `*_create_weclapp_*` migration files;
+4. re-publish (see above) and run `php artisan migrate`;
+5. run a full `php artisan weclapp:sync`.
+
+Writing alter migrations by hand works too; the list above is complete.
 
 ### Sync entities
 
