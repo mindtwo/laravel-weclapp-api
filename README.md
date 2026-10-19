@@ -170,6 +170,11 @@ WeclappClient::customers()->query(['company-eq' => 'ACME GmbH']);
 // GET /party?customer-eq=true&company-eq=ACME+GmbH
 ```
 
+The view holds for `find()` and `create()` too: `customers()->find($id)` answers
+`null` for a party that is not a customer, and `customers()->create($data)`
+sets `customer: true` unless `$data` says otherwise. `update()` and `delete()`
+address a party by id, whatever its roles.
+
 ### What the spec does not tell you about writes
 
 The OpenAPI spec describes shape, not behaviour. Everything below was established

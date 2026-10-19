@@ -12,4 +12,11 @@ class Supplier extends Endpoint
     protected string $path = 'party';
 
     protected array $defaultFilters = ['supplier-eq' => 'true'];
+
+    protected array $defaultAttributes = ['supplier' => true];
+
+    protected function matches(object $record): bool
+    {
+        return ($record->supplier ?? false) === true;
+    }
 }

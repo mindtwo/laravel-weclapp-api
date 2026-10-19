@@ -36,6 +36,14 @@ abstract class Endpoint
     protected array $defaultFilters = [];
 
     /**
+     * Attributes a view sets on every record it creates, so a party created
+     * through customers() is a customer. The caller's data wins on a clash.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $defaultAttributes = [];
+
+    /**
      * The write operations this resource offers, taken from the OpenAPI spec.
      * Not every resource is writable: some are reports or system-maintained
      * lists, so calling an unsupported write fails here instead of returning a
@@ -78,7 +86,18 @@ abstract class Endpoint
      */
     public function find(string|int $id): ?object
     {
-        return $this->api->find($this->path, $id);
+        $record = $this->api->find($this->path, $id);
+
+        return $record !== null && $this->matches($record) ? $record : null;
+    }
+
+    /**
+     * Whether a record belongs to this view; a filtered view narrows find()
+     * the way defaultFilters narrows query(). Everything matches by default.
+     */
+    protected function matches(object $record): bool
+    {
+        return true;
     }
 
     /**
@@ -104,7 +123,7 @@ abstract class Endpoint
     {
         $this->guardWrite('create');
 
-        return new LazyResponseProxy($this->api, $this->path, Request::METHOD_POST, body: $data);
+        return new LazyResponseProxy($this->api, $this->path, Request::METHOD_POST, body: [...$this->defaultAttributes, ...$data]);
     }
 
     /**

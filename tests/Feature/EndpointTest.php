@@ -55,3 +55,23 @@ it('returns a lazy proxy for writes and posts to the entity path', function () {
     Http::assertSent(fn ($request) => str_ends_with($request->url(), '/quotation')
         && $request->method() === 'POST');
 });
+
+describe('customer and supplier views', function () {
+    it('answer null from find() for a party outside the view', function () {
+        Http::fake(['*/party/id/7' => Http::response(['id' => '7', 'customer' => false, 'supplier' => true], 200)]);
+
+        expect(WeclappClient::customers()->find(7))->toBeNull()
+            ->and(WeclappClient::suppliers()->find(7)?->id)->toBe('7')
+            ->and(WeclappClient::parties()->find(7)?->id)->toBe('7');
+    });
+
+    it('set the role flag on create(), unless the caller decides otherwise', function () {
+        Http::fake(['*/party' => Http::response(['id' => '8'], 201)]);
+
+        WeclappClient::customers()->create(['company' => 'ACME'])->status();
+        WeclappClient::suppliers()->create(['company' => 'ACME', 'supplier' => false])->status();
+
+        Http::assertSent(fn ($request) => $request['company'] === 'ACME' && ($request['customer'] ?? null) === true);
+        Http::assertSent(fn ($request) => $request['company'] === 'ACME' && ($request['supplier'] ?? null) === false);
+    });
+});

@@ -12,4 +12,11 @@ class Customer extends Endpoint
     protected string $path = 'party';
 
     protected array $defaultFilters = ['customer-eq' => 'true'];
+
+    protected array $defaultAttributes = ['customer' => true];
+
+    protected function matches(object $record): bool
+    {
+        return ($record->customer ?? false) === true;
+    }
 }
