@@ -34,7 +34,7 @@
 /.husky                 export-ignore
 /commitlint.config.cjs  export-ignore
 /grumphp.yml            export-ignore
-/release.config.js      export-ignore
+/release.config.cjs     export-ignore
 /release.js             export-ignore
 
 # Node toolchain — the package itself ships no JS

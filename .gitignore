@@ -165,6 +165,11 @@ Thumbs.db
 # nested build directory, which is more than intended.
 /build
 report.junit.xml
+# Written by release.config.cjs on every load and only removed after a
+# successful release, so a dry run or a failed run leaves them behind.
+/sha256sums.txt
+/md5sums.txt
+/b2sums.txt
 
 # Local code-review output (mindtwo-dev:review-code)
 /.code-review/
