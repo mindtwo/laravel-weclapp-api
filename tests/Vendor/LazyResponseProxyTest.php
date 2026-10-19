@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
@@ -58,4 +60,66 @@ it('refuses to execute after the job was retrieved', function () {
     $proxy->getJob();
 
     expect(fn () => $proxy->status())->toThrow(RuntimeException::class);
+});
+
+describe('a proxy nobody reads', function () {
+    beforeEach(function () {
+        // The transport's own retries are the client's concern; count the proxy's attempts only.
+        config()->set('weclapp-api.http.retry_times', 1);
+        config()->set('weclapp-api.http.retry_sleep', 0);
+    });
+
+    it('still sends its request when it goes out of scope', function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+        Http::fake(['*/ticket/id/9' => Http::response('', 204)]);
+
+        (function (): void {
+            WeclappClient::tickets()->delete(9);
+        })();
+
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/ticket/id/9'));
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($event) => $event->method === 'DELETE');
+    });
+
+    it('sends nothing when the job was handed out instead', function () {
+        Http::fake();
+
+        (function (): void {
+            WeclappClient::tickets()->delete(9)->getJob();
+        })();
+
+        Http::assertNothingSent();
+    });
+
+    it('does not resend an attempt that already threw', function () {
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            $calls++;
+
+            throw new ConnectionException('timed out');
+        });
+
+        (function (): void {
+            $proxy = WeclappClient::tickets()->delete(9);
+
+            try {
+                $proxy->status();
+            } catch (ConnectionException) {
+                // The caller saw it; the destructor must not try again.
+            }
+        })();
+
+        expect($calls)->toBe(1);
+    });
+
+    it('reports rather than throws a failure of the late send', function () {
+        Http::fake(fn () => throw new ConnectionException('timed out'));
+        $handler = Mockery::mock(ExceptionHandler::class);
+        $handler->shouldReceive('report')->once()->with(Mockery::type(ConnectionException::class));
+        app()->instance(ExceptionHandler::class, $handler);
+
+        (function (): void {
+            WeclappClient::tickets()->delete(9);
+        })();
+    });
 });

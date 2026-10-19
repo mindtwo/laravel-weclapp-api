@@ -247,13 +247,19 @@ that worked. Probe the operation you care about instead of reading the list.
 
 `create()`, `update()` and `delete()` return a `LazyResponseProxy`. It behaves
 like an `Illuminate\Http\Client\Response` when you read from it, executing the
-request on first access:
+request on first access — or, if nothing reads from it, when it goes out of
+scope, so a write used as a plain statement still happens:
 
 ```php
 $response = WeclappClient::quotations()->create($payload);
 
 $id = $response->json()['id']; // executes here
+
+WeclappClient::tickets()->delete(9); // executes at the end of the statement
 ```
+
+A request sent that late has no caller left to throw to, so a failure is
+passed to the application's exception handler (`report()`) instead.
 
 Or hand back an undispatched, rate-limited job instead of executing inline:
 

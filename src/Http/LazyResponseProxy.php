@@ -12,6 +12,7 @@ use Mindtwo\LaravelWeclappApi\Jobs\WeclappApiCallJob;
 use Mindtwo\LaravelWeclappApi\WeclappClient;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
+use Throwable;
 
 /**
  * A response proxy that behaves like a Response but can also hand back a job.
@@ -20,6 +21,11 @@ use Symfony\Component\HttpFoundation\Request;
  * accessed and caches the result. Calling getJob() instead returns an
  * undispatched WeclappApiCallJob for manual queueing; after that, executing
  * synchronously is no longer allowed.
+ *
+ * A proxy nobody reads from still sends its request, when it goes out of
+ * scope: `WeclappClient::tickets()->delete(9);` as a statement has to delete
+ * the ticket, the way the generic `WeclappClient::delete()` would. Only
+ * getJob() opts out of that.
  *
  * @mixin Response
  */
@@ -87,6 +93,10 @@ class LazyResponseProxy
             return $this->response = new Response(new PsrResponse(200, [], (string) json_encode([])));
         }
 
+        // Marked before the request goes out: an attempt that throws must not
+        // be made a second time by the destructor.
+        $this->executed = true;
+
         $client = $this->api->client();
 
         if (! empty($this->queryParams)) {
@@ -100,8 +110,6 @@ class LazyResponseProxy
             Request::METHOD_DELETE => $client->delete($this->endpoint),
             default                => throw new \InvalidArgumentException("Unsupported HTTP method: {$this->method}"),
         };
-
-        $this->executed = true;
 
         WeclappApiCallCompleted::dispatch(
             $this->endpoint,
@@ -142,5 +150,24 @@ class LazyResponseProxy
     public function __toString(): string
     {
         return (string) $this->execute();
+    }
+
+    /**
+     * Send a request nobody asked to read, the way PendingDispatch dispatches
+     * a job nobody chained on. A failure is reported rather than thrown: no
+     * caller is left to catch it, and throwing from a destructor during
+     * shutdown is fatal.
+     */
+    public function __destruct()
+    {
+        if ($this->executed || $this->jobRetrieved) {
+            return;
+        }
+
+        try {
+            $this->execute();
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 }
