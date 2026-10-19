@@ -380,10 +380,16 @@ proven to work whenever a consumer actually needs it.
 is both faster and more accurate than hand-writing it:
 
 ```bash
-php artisan weclapp:make-mirror articlePrice          # migration + model + factory
-php artisan weclapp:make-mirror salesInvoice --dry    # preview only
+php artisan weclapp:make-mirror opportunity              # migration + model + factory
+php artisan weclapp:make-mirror contract --dry           # list what would be written
 php artisan weclapp:make-mirror ticket --only=id,subject,ticketNumber
+php artisan weclapp:make-mirror articlePrice --force     # regenerate a shipped mirror in place
 ```
+
+The command is only registered when `docs/specifications` is present, i.e. in
+a git checkout; a Composer install has no spec and no generator. It refuses to
+touch a file that already exists unless `--force` is given, and checks all
+three targets before writing any of them.
 
 It resolves the `allOf` chain, maps types (`format: timestamp` → `datetime` and
 into `dates`; `format: decimal` → `decimal`; `id`, fields the spec marks as an

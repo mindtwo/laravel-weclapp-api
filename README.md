@@ -422,27 +422,15 @@ If you need any of these, use the client and typed endpoints directly and projec
 the response into your own schema. The mirror tables are for consumers that want a
 faithful local copy of Weclapp; they are not a prerequisite for using the package.
 
-### Adding a mirror for another entity
+### Mirrors for other entities
 
-Only a few of the 155 resources ship with a mirror table. Scaffold one from the
-vendored OpenAPI spec rather than hand-writing it:
-
-```bash
-php artisan weclapp:make-mirror articlePrice
-php artisan weclapp:make-mirror salesInvoice --dry              # preview
-php artisan weclapp:make-mirror ticket --only=id,subject        # trim up front
-```
-
-It writes the migration, model and factory with types, string lengths and
-factory enum values taken from the spec, skips nested collections, and prints
-the `SyncRegistry` entry to paste. Treat the output as a starting point and trim
-the columns you will not read.
-
-## Testing
-
-```bash
-composer test
-```
+The shipped mirrors are a documented default, not a complete model of Weclapp:
+an entity gets one when something reads it. For any other entity, read it
+through its typed endpoint or the generic client and project the response into
+your own schema. Adding a mirror is a change to this package — the
+`weclapp:make-mirror` generator that scaffolds one from the vendored spec is
+development tooling, present in a git checkout but not in a Composer install,
+and is described in [CONTRIBUTING](CONTRIBUTING.md#adding-a-mirror-entity-or-sync-command).
 
 ## Upgrading from a pre-release build
 
