@@ -206,7 +206,9 @@ A new class is only ever needed after the vendored spec was refreshed and now
 documents a resource at `/{resource}/id/{id}` that has no class yet — run the
 suite and `EndpointSpecConformanceTest` names each one. A resource without that
 record path (`/salesChannel/activeSalesChannels`, for instance) is not a CRUD
-resource and gets no class; reach it through `WeclappClient::get()`.
+resource and gets no class; reach it through the raw client,
+`WeclappClient::client()->get(...)`. `WeclappClient::get()` adds `sort=id`, an
+`id-gt` cursor and paging, which only a resource collection understands.
 
 ### 1. Create the endpoint class
 
