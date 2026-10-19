@@ -175,6 +175,7 @@ use Mindtwo\LaravelWeclappApi\Http\Endpoints\WorkScheduleProfile;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
 use Throwable;
+use UnexpectedValueException;
 
 class WeclappClient
 {
@@ -266,6 +267,7 @@ class WeclappClient
      * @param array<string, mixed> $params
      *
      * @throws RequestException
+     * @throws UnexpectedValueException when Weclapp ignores the id cursor
      *
      * @return Collection<int, object>
      */
@@ -360,7 +362,7 @@ class WeclappClient
             // everything behind it, which the sync would then archive.
             if ($keyset && $lastId !== null && $pageLastId !== null && (int) $pageLastId <= (int) $lastId) {
                 if (count($batch) >= $pageSize) {
-                    throw new RuntimeException(sprintf(
+                    throw new UnexpectedValueException(sprintf(
                         'Weclapp ignored the id cursor on /%s: page after id %s ends at id %s.',
                         $endpoint,
                         $lastId,

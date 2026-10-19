@@ -6,10 +6,11 @@ namespace Mindtwo\LaravelWeclappApi\Commands\Concerns;
 
 use Closure;
 use Illuminate\Database\QueryException;
-use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Support\Facades\Schema;
 use Mindtwo\LaravelWeclappApi\Sync\SyncDefinition;
 use Mindtwo\LaravelWeclappApi\Sync\SyncRegistry;
+use UnexpectedValueException;
 
 /**
  * The entity loop shared by weclapp:sync and weclapp:update.
@@ -17,10 +18,11 @@ use Mindtwo\LaravelWeclappApi\Sync\SyncRegistry;
  * Without an entity argument the command runs every registered definition.
  * Consumers publish only the mirror tables they read, so a definition whose
  * table is not migrated is skipped before anything is downloaded, and one
- * entity failing — a 403 on an unlicensed module, a schema mismatch — does not
- * stop the entities behind it. The run still exits non-zero so a scheduler
- * notices. A named entity gets no skip: asking for it explicitly means its
- * table is expected to exist.
+ * entity failing — a 403 on an unlicensed module, a timeout, an ignored id
+ * cursor, a schema mismatch — does not stop the entities behind it. The run
+ * still exits non-zero so a scheduler notices. A missing URL or key stays
+ * fatal, since every entity would fail the same way. A named entity gets no
+ * skip: asking for it explicitly means its table is expected to exist.
  */
 trait RunsSyncDefinitions
 {
@@ -54,7 +56,7 @@ trait RunsSyncDefinitions
 
             try {
                 $sync($definition, $slug);
-            } catch (RequestException|QueryException $e) {
+            } catch (HttpClientException|QueryException|UnexpectedValueException $e) {
                 $this->error(sprintf('%s: %s', $slug, $e->getMessage()));
                 $failed = true;
             }

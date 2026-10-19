@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -664,6 +665,26 @@ describe('without an entity argument', function () {
             ->assertFailed();
 
         expect(ArticlePrice::query()->where('weclapp_id', 30002)->exists())->toBeTrue();
+    });
+
+    it('keeps going after an entity times out, and exits non-zero', function () {
+        config()->set('weclapp-api.http.retry_times', 1);
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), '/quotation')) {
+                throw new ConnectionException('timed out');
+            }
+
+            return str_contains($request->url(), '/articlePrice') && ! str_contains($request->url(), 'id-gt')
+                ? Http::response(['result' => [['id' => 30004, 'articleId' => 1, 'price' => '1.00']]], 200)
+                : Http::response(['result' => []], 200);
+        });
+
+        $this->artisan('weclapp:sync')
+            ->expectsOutputToContain('quotations: timed out')
+            ->expectsOutputToContain('Synced 1 article-prices.')
+            ->assertFailed();
+
+        expect(ArticlePrice::query()->where('weclapp_id', 30004)->exists())->toBeTrue();
     });
 
     it('applies the same guard to the incremental update', function () {
