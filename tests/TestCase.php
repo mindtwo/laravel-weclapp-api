@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Mindtwo\LaravelWeclappApi\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -43,11 +45,5 @@ class TestCase extends Orchestra
         // test overrides this to false. (In a real app the config defaults to
         // off on local/testing.)
         config()->set('weclapp-api.writes_enabled', true);
-
-        /*
-         foreach (\Illuminate\Support\Facades\File::allFiles(__DIR__ . '/../database/migrations') as $migration) {
-            (include $migration->getRealPath())->up();
-         }
-         */
     }
 }

@@ -100,8 +100,14 @@ Help improve test coverage by:
 3. **Install dependencies**:
    ```bash
    composer install
-   npm install
+   npm ci
    ```
+
+   `composer.json` pins `orchestra/canvas` and `orchestra/canvas-core` to
+   `preferred-install: source`. Testbench pulls them in, GitHub's by-commit
+   archives for them intermittently answer 404, and Composer no longer falls
+   back from dist to source on its own — so CI installs failed at random. Keep
+   the pin until that changes; everything else installs from dist.
 
 4. **Create a feature branch**:
    ```bash

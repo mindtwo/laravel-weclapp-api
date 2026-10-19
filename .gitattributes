@@ -49,7 +49,6 @@
 
 # Tests and their harness
 /phpunit.xml            export-ignore
-/phpunit.xml.dist       export-ignore
 /testbench.yaml         export-ignore
 /tests                  export-ignore
 /workbench              export-ignore

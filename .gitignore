@@ -128,7 +128,7 @@ sw.*
 *.swp
 
 # "AI"
-/.ai/plans
+/.ai/plans/*
 !/.ai/plans/.gitkeep
 /.claude/*.lock
 /.claude/settings.local.json
@@ -158,7 +158,6 @@ Thumbs.db
 
 # custom project files and directories
 .env
-.context
 /package.xml
 # All generated build output: phpstan cache, coverage reports, junit logs.
 # Broader than the old `build/phpstan` so a coverage run stops staging itself.

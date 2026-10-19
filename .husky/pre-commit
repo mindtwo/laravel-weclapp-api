@@ -1,18 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env sh
+
+# Husky runs hooks with `sh -e`, whatever the shebang says: POSIX only.
 
 # Pick the first nvm that actually has node versions installed: a bare nvm.sh
 # with an empty versions/ dir makes `nvm use` fail on the .nvmrc version.
 for dir in "${NVM_DIR:-}" "$HOME/.nvm" "$HOME/Library/Application Support/Herd/config/nvm"; do
-    if [[ -s "$dir/nvm.sh" && -d "$dir/versions/node" ]]; then
+    if [ -s "$dir/nvm.sh" ] && [ -d "$dir/versions/node" ]; then
         export NVM_DIR="$dir"
         break
     fi
 done
 
-[[ -s "$NVM_DIR/nvm.sh" ]] && \. "$NVM_DIR/nvm.sh"
+[ -n "${NVM_DIR:-}" ] && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-if [[ -f ".nvmrc" ]] && command -v nvm >/dev/null 2>&1; then
-    nvm use
+if [ -f ".nvmrc" ] && command -v nvm >/dev/null 2>&1; then
+    # A missing .nvmrc version must not block the commit; the default node runs.
+    nvm use || true
 fi
 
 npm test
