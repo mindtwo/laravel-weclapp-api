@@ -91,6 +91,21 @@ class SpecReader
     }
 
     /**
+     * The schema a resource's records have, read from the GET /{resource}/id/{id}
+     * response, or null when the spec has no such operation.
+     *
+     * Most resources are backed by a schema of the same name, but 33 are not: the
+     * lookup lists answer with the shared `customValue`, and the four
+     * shipmentReturn* resources with `shipmentReturnDescription`.
+     */
+    public static function schemaFor(string $resource): ?string
+    {
+        $ref = self::spec()['paths']["/{$resource}/id/{id}"]['get']['responses']['200']['content']['application/json']['schema']['$ref'] ?? null;
+
+        return is_string($ref) ? self::refName($ref) : null;
+    }
+
+    /**
      * The allowed values of an enum-typed property, or null if it is not an enum.
      *
      * Enums are `$ref`s to standalone schemas rather than inline lists, so

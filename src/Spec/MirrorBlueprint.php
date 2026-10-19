@@ -30,7 +30,7 @@ class MirrorBlueprint
         $columns = [];
         $skipped = [];
 
-        foreach (SpecReader::properties($resource) as $name => $property) {
+        foreach (SpecReader::properties(SpecReader::schemaFor($resource) ?? $resource) as $name => $property) {
             $column = self::column($name, $property);
 
             if (is_string($column)) {

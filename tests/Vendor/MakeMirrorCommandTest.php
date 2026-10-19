@@ -101,6 +101,17 @@ it('keeps weclapp_id even when --only omits it', function () {
         ->and($filtered->columns)->toHaveCount(2);
 });
 
+it('reads the schema from the GET-by-id response, which is not always the resource name', function () {
+    expect(SpecReader::schemaFor('articlePrice'))->toBe('articlePrice')
+        ->and(SpecReader::schemaFor('articleAccountingCode'))->toBe('customValue')
+        ->and(SpecReader::schemaFor('shipmentReturnReason'))->toBe('shipmentReturnDescription')
+        ->and(SpecReader::schemaFor('notARealResource'))->toBeNull();
+
+    // Both used to come back empty, and the command refused them as having nothing to mirror.
+    expect(array_column(MirrorBlueprint::for('shipmentReturnReason')->columns, 'name'))->toContain('weclapp_id', 'name')
+        ->and(array_column(MirrorBlueprint::for('articleAccountingCode')->columns, 'name'))->toContain('weclapp_id', 'name');
+});
+
 it('names the table and model from the resource', function () {
     expect(MirrorBlueprint::for('salesInvoice')->table())->toBe('weclapp_sales_invoices')
         ->and(MirrorBlueprint::for('salesInvoice')->modelClass())->toBe('SalesInvoice');
@@ -156,10 +167,9 @@ it('derives a usable blueprint for every resource in the spec', function () {
     foreach (SpecReader::resources() as $resource) {
         $blueprint = MirrorBlueprint::for($resource);
 
-        if ($blueprint->columns === []) {
-            // lookup lists whose response refs the shared customValue schema
-            continue;
-        }
+        // Every resource resolves to a schema with scalars, the lookup lists and
+        // the shipmentReturn* ones through the schema their GET-by-id answers with.
+        expect($blueprint->columns)->not->toBe([], "{$resource}: no columns");
 
         $names = array_column($blueprint->columns, 'name');
 
@@ -180,7 +190,7 @@ it('derives a usable blueprint for every resource in the spec', function () {
         $checked++;
     }
 
-    expect($checked)->toBeGreaterThan(100);
+    expect($checked)->toBe(count(SpecReader::resources()));
 });
 
 it('generates parseable php for every resource in the spec', function () {
@@ -190,10 +200,6 @@ it('generates parseable php for every resource in the spec', function () {
 
     foreach (SpecReader::resources() as $resource) {
         $blueprint = MirrorBlueprint::for($resource);
-
-        if ($blueprint->columns === []) {
-            continue;
-        }
 
         foreach (['migration', 'model', 'factory'] as $kind) {
             $source = (string) (new ReflectionMethod($command, $kind))->invoke($command, $blueprint);
