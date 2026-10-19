@@ -444,12 +444,15 @@ the columns you will not read.
 composer test
 ```
 
-## Upgrading
+## Upgrading from a pre-release build
 
-### Environment variables are now `MINDTWO_WECLAPP_*` prefixed
+Nothing has been tagged yet. These notes are for applications that installed
+this package from its development branch before the first release; a fresh
+install can skip them.
 
-Every setting is read from a `MINDTWO_WECLAPP_`-prefixed variable. Previously the
-config read unprefixed `WECLAPP_*` names while `.env.example` already documented
+### Environment variables are `MINDTWO_WECLAPP_*` prefixed
+
+Early builds read unprefixed `WECLAPP_*` names while `.env.example` documented
 the prefixed ones, so a token placed under the documented name resolved to an
 empty string and requests went out unauthenticated. Rename the following in your
 `.env`:
@@ -473,7 +476,8 @@ empty string and requests went out unauthenticated. Rename the following in your
 | `WECLAPP_LOG_INCLUDE_PAYLOAD` | `MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD` |
 
 Note that `WECLAPP_TOKEN` is not simply prefixed — it becomes
-`MINDTWO_WECLAPP_API_KEY`.
+`MINDTWO_WECLAPP_API_KEY`. `MINDTWO_WECLAPP_QUEUE_API_CALLS` has no
+replacement: a call is queued by asking its proxy for `->getJob()`.
 
 **If you have published `config/weclapp-api.php`**, your copy takes precedence
 over the package's, so nothing breaks until you re-publish — but the two have
@@ -482,13 +486,35 @@ otherwise re-publishing swaps in the new names and leaves your old `.env`
 unread. `tests/Vendor/ConfigEnvNamesTest.php` pins the package config and
 `.env.example` to each other.
 
-### `Amount` and `Report` have been removed
+### Mirror tables changed in place
 
-The `Amount` and `Report` models, their factories and their migrations are gone,
-along with `Quotation::report()`. Neither was a Weclapp resource — no endpoint,
-no entry in the OpenAPI v2 spec — and `SyncRegistry` never populated them, so
-`weclapp_amounts` and `weclapp_reports` could not receive a row. If you
-published the migrations, drop both tables.
+The create migrations were edited rather than extended while unreleased. A
+table published from an earlier build lacks:
+
+- `deleted_at` on every table (every mirror model soft-deletes; a query on a
+  table without the column fails);
+- `weclapp_id` as `NOT NULL UNIQUE` (it was a nullable index);
+- `weclapp_articles`: `visible`, `long_text`, `supply_source_count`,
+  `primary_supply_source_id`, `main_image_id`, `main_image_filename`;
+- `weclapp_article_prices`: `reduction_type`, `reduction_value`, and amounts
+  as `decimal(18,5)` instead of `decimal(12,4)`;
+- `weclapp_parties`: `is_customer`, `is_supplier`;
+- `weclapp_article_categories`: `last_modified`;
+- `weclapp_sales_invoices.description` as `text` instead of `varchar(255)`;
+- `weclapp_quotations.report_id` is gone, as are the `weclapp_amounts` and
+  `weclapp_reports` tables with their `Amount` and `Report` models and
+  `Quotation::report()` — none of them was a Weclapp resource.
+
+A mirror holds no data of its own, so the straightforward path is to drop the
+`weclapp_*` tables, delete the published migrations, re-publish, migrate and
+run a full `weclapp:sync`. Writing alter migrations by hand works too; the list
+above is complete.
+
+### Sync entities
+
+`weclapp:sync customers` and `weclapp:sync suppliers` are now one
+`weclapp:sync parties`; filter on `is_customer` / `is_supplier`, or use
+`Party::customers()` / `Party::suppliers()`.
 
 ## Changelog
 

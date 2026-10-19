@@ -365,7 +365,7 @@ grounds that it might be useful one day.
 
 That rule exists because it was once broken: `weclapp_amounts` and
 `weclapp_reports` were built without a reader, could never receive a row, and
-were removed in `df9b58b`. Generating all 119 mirror-able resources would be the
+were removed before the first release. Generating every mirror-able resource would be the
 same mistake at scale — 357 files, 2,095 columns and a `weclapp:sync` that would
 hammer every licensed module.
 

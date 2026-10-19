@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-// The config previously read WECLAPP_* while .env.example provided
-// MINDTWO_WECLAPP_*, so a real token resolved to '' and every request went out
-// unauthenticated. These tests keep the two files in agreement.
+// The config and .env.example once named the same settings differently, so a
+// token placed under the documented name resolved to '' and every request went
+// out unauthenticated. These tests keep the two files in agreement.
 
 function configEnvNames(): array
 {
