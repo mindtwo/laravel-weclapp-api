@@ -218,8 +218,7 @@ it('generates parseable php for every resource in the spec', function () {
     }
 
     expect($parsed)->toBeGreaterThan(300);
-    // nikic/php-parser arrives with phpstan rather than being declared here.
-})->skip(! class_exists(PhpParser\ParserFactory::class), 'nikic/php-parser not installed');
+});
 
 it('generates syntactically valid php for every mirrored resource', function (string $resource) {
     $command = app()->make(Mindtwo\LaravelWeclappApi\Commands\WeclappMakeMirrorCommand::class);
