@@ -302,3 +302,12 @@ it('scaffolds a mirror that soft-deletes and reconciles, like the shipped ones',
         ->and($render('model'))->toContain('$deleted_at')
         ->and($render('registryEntry'))->toContain('reconciles: true,');
 });
+
+it('tells the package checkout from an install as a dependency', function (string $root, bool $checkout) {
+    expect(SpecReader::inPackageCheckout($root))->toBe($checkout);
+})->with([
+    'a contributor checkout'                 => ['/home/dev/laravel-weclapp-api', true],
+    'a source install in an app'             => ['/var/www/app/vendor/mindtwo/laravel-weclapp-api', false],
+    'a source install on Windows'            => ['C:\\app\\vendor\\mindtwo\\laravel-weclapp-api', false],
+    'this checkout, as the provider sees it' => [str_replace('\\', '/', (string) realpath(__DIR__.'/../..')), true],
+]);

@@ -66,7 +66,8 @@ abstract class Endpoint
     }
 
     /**
-     * Fetch every record matching the given filters (all pages merged).
+     * Fetch every record matching the given filters (all pages merged), or with
+     * a `page` filter just that page.
      *
      * @param array<string, mixed> $filters
      *

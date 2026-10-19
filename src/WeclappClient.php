@@ -267,7 +267,9 @@ class WeclappClient
      * answers every page short.
      *
      * A caller that orders the result itself, or filters on the id, gets plain
-     * offset pages: a second sort or id filter would contradict its own.
+     * offset pages: a second sort or id filter would contradict its own. A caller
+     * that passes `page` gets exactly that page (with its own `pageSize`), for
+     * collections too large to hold in memory at once.
      *
      * @param array<string, mixed> $params
      *
@@ -277,6 +279,18 @@ class WeclappClient
      */
     public function get(string $endpoint, array $params = []): Collection
     {
+        // A caller asking for a page gets that page, not the whole collection.
+        if (isset($params['page'])) {
+            $response = $this->client()->get($this->path($endpoint), [
+                ...$params,
+                'pageSize' => max(1, min(1000, (int) ($params['pageSize'] ?? config('weclapp-api.page_size', 1000)))),
+            ]);
+
+            $response->throw();
+
+            return collect(array_values(array_filter((array) ($response->object()->result ?? []), 'is_object')));
+        }
+
         // Weclapp caps pageSize at 1000; anything below 1 would never end the loop.
         $pageSize = max(1, min(1000, (int) config('weclapp-api.page_size', 1000)));
         $keyset = ! isset($params['sort']) && ! $this->filtersOnId($params);

@@ -377,9 +377,9 @@ class WeclappApiServiceProvider extends PackageServiceProvider
         // consumer command: it reads the spec under docs/ (export-ignored, so
         // absent from a composer install) and writes into the package's own
         // src/ and database/ — which for a consumer is inside vendor/.
-        // Registering it only when the spec is present keeps it out of consumer
-        // apps while leaving it available in a git checkout.
-        if (SpecReader::available()) {
+        // Registering it only in the package's own checkout keeps it out of
+        // consumer apps — including source installs, which do bring docs/ along.
+        if (SpecReader::available() && SpecReader::inPackageCheckout()) {
             $package->hasCommand(WeclappMakeMirrorCommand::class);
         }
     }

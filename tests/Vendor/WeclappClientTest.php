@@ -467,3 +467,22 @@ it('identifies itself with a User-Agent, as the spec asks of automated clients',
 
     Http::assertSent(fn ($request) => $request->hasHeader('User-Agent', 'mindtwo/laravel-weclapp-api'));
 });
+
+it('returns just the requested page when the caller asks for one', function () {
+    Http::fake(['*' => Http::response(['result' => [['id' => '7'], ['id' => '8']]], 200)]);
+
+    expect(WeclappClient::get('party', ['page' => 3, 'pageSize' => 2]))->toHaveCount(2);
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request) => query($request)['page'] === '3'
+        && query($request)['pageSize'] === '2'
+        && ! isset(query($request)['sort'], query($request)['id-gt']));
+});
+
+it('clamps a requested page size to what Weclapp allows', function () {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('party', ['page' => 1, 'pageSize' => 5000]);
+
+    Http::assertSent(fn ($request) => query($request)['pageSize'] === '1000');
+});

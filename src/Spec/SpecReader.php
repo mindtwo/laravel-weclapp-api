@@ -37,6 +37,20 @@ class SpecReader
     }
 
     /**
+     * Whether the package runs from its own checkout rather than as a dependency.
+     *
+     * A source install (`dev-main`, `--prefer-source`) brings docs/ along, so the
+     * spec alone does not tell a contributor's checkout from a consumer's
+     * vendor/ directory — and the generator writes into the package itself.
+     */
+    public static function inPackageCheckout(?string $packageRoot = null): bool
+    {
+        $root = str_replace('\\', '/', $packageRoot ?? (string) realpath(__DIR__.'/../..'));
+
+        return ! str_contains($root.'/', '/vendor/');
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function spec(): array
