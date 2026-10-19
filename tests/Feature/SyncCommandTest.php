@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -685,6 +686,39 @@ describe('without an entity argument', function () {
             ->assertFailed();
 
         expect(ArticlePrice::query()->where('weclapp_id', 30004)->exists())->toBeTrue();
+    });
+
+    it('skips an entity another run holds, keeps going, and exits non-zero', function () {
+        Http::fake([
+            '*articlePrice*' => Http::sequence()
+                ->push(['result' => [['id' => 30005, 'articleId' => 1, 'price' => '1.00']]], 200)
+                ->push(['result' => []], 200),
+            '*' => Http::response(['result' => []], 200),
+        ]);
+        $held = Cache::lock('weclapp-api:sync:quotations', 60);
+        $held->get();
+
+        $this->artisan('weclapp:update')
+            ->expectsOutputToContain('Skipped quotations: another weclapp:sync or weclapp:update is running it.')
+            ->expectsOutputToContain('Updated 1 article-prices')
+            ->assertFailed();
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/quotation'));
+        expect(ArticlePrice::query()->where('weclapp_id', 30005)->exists())->toBeTrue();
+
+        $held->release();
+    });
+
+    it('releases the entity lock after a run, also after a failure', function () {
+        Http::fake([
+            '*quotation*' => Http::response(['detail' => 'forbidden'], 403),
+            '*'           => Http::response(['result' => []], 200),
+        ]);
+
+        $this->artisan('weclapp:sync')->assertFailed();
+
+        expect(Cache::lock('weclapp-api:sync:quotations', 1)->get())->toBeTrue()
+            ->and(Cache::lock('weclapp-api:sync:articles', 1)->get())->toBeTrue();
     });
 
     it('applies the same guard to the incremental update', function () {

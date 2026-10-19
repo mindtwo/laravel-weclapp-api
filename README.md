@@ -402,11 +402,13 @@ Entities whose table you did not publish are skipped, and an entity Weclapp
 refuses (for example a `403` on an unlicensed module) is reported and does not
 stop the ones after it; the command then exits non-zero so a scheduler notices.
 
-Two runs of the same entity must not overlap — the mirror's `weclapp_id` is
-unique, so a second run racing the first fails on the insert instead of
-duplicating the row. Both commands are `Isolatable`: schedule them with
-`--isolated` (or `->withoutOverlapping()`) so a slow nightly `weclapp:sync` and
-an hourly `weclapp:update` never run at the same time.
+Two runs of the same entity never overlap: both commands take the same cache
+lock per entity, so a slow nightly `weclapp:sync` and an hourly
+`weclapp:update` cannot write one mirror at once. An entity whose lock is held
+is skipped with a warning and the run exits non-zero; other entities still
+run. The lock expires after 24 hours, so a crashed run cannot block the mirror
+for longer. It needs a cache store that supports locks (`file`, `database`,
+`redis`, `memcached`, `dynamodb` or `array`).
 
 Supported sync entities: `parties`, `article-categories`, `articles`, `users`,
 `quotations`, `sales-orders`, `projects`, `article-prices`, `sales-invoices`.
