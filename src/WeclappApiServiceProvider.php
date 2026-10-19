@@ -401,14 +401,17 @@ class WeclappApiServiceProvider extends PackageServiceProvider
         // Two granularities: `weclapp-api-migrations` publishes every mirror
         // table, and one tag per entity publishes just that table. Consumers
         // rarely want all of them -- take only the entities you actually read.
-        $this->publishesMigrations([
-            __DIR__.'/../database/migrations' => database_path('migrations'),
-        ], 'weclapp-api-migrations');
-
+        //
+        // publishes(), not publishesMigrations(): the latter stamps every copy
+        // with the publish date, but vendor:publish checks for an existing file
+        // under the original name, so each publish — a second tag, or the same
+        // tag a second later — copied the migration again and migrate failed on
+        // the duplicate create. Keeping the package's own dates makes every tag
+        // idempotent, and both tags share one mapping per file.
         foreach (self::MIGRATIONS as $entity => $migration) {
-            $this->publishesMigrations([
+            $this->publishes([
                 __DIR__.'/../database/migrations/'.$migration => database_path('migrations/'.$migration),
-            ], 'weclapp-api-migrations-'.$entity);
+            ], ['weclapp-api-migrations', 'weclapp-api-migrations-'.$entity]);
         }
 
         RateLimiter::for('weclapp-api-jobs', function (): Limit {

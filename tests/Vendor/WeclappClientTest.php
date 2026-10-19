@@ -450,3 +450,20 @@ it('returns an empty array for a post whose success has no body', function () {
 
     expect(WeclappClient::post('salesOrder/id/5/createInvoice', []))->toBe([]);
 });
+
+it('refuses to send without a base url or a token, naming the setting', function () {
+    config()->set('weclapp-api.base_url', '');
+    expect(fn () => WeclappClient::get('party'))->toThrow(RuntimeException::class, 'MINDTWO_WECLAPP_URL');
+
+    config()->set('weclapp-api.base_url', 'https://tenant.weclapp.com/webapp/api/v2/');
+    config()->set('weclapp-api.token', '');
+    expect(fn () => WeclappClient::get('party'))->toThrow(RuntimeException::class, 'MINDTWO_WECLAPP_API_KEY');
+});
+
+it('identifies itself with a User-Agent, as the spec asks of automated clients', function () {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('party');
+
+    Http::assertSent(fn ($request) => $request->hasHeader('User-Agent', 'mindtwo/laravel-weclapp-api'));
+});

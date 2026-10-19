@@ -185,13 +185,25 @@ class WeclappClient
      */
     public function client(): PendingRequest
     {
-        $baseUrl = rtrim((string) config('weclapp-api.base_url'), '/').'/';
+        $baseUrl = rtrim((string) config('weclapp-api.base_url'), '/');
+        $token = (string) config('weclapp-api.token');
 
-        return Http::baseUrl($baseUrl)
+        // A missing setting once sent every request unauthenticated; fail here
+        // instead, naming what to set.
+        if ($baseUrl === '' || $token === '') {
+            throw new RuntimeException(sprintf(
+                'Weclapp is not configured: set %s.',
+                $baseUrl === '' ? 'MINDTWO_WECLAPP_URL' : 'MINDTWO_WECLAPP_API_KEY',
+            ));
+        }
+
+        return Http::baseUrl($baseUrl.'/')
             ->withHeaders([
-                'AuthenticationToken' => (string) config('weclapp-api.token'),
+                'AuthenticationToken' => $token,
                 'Accept'              => 'application/json',
                 'Content-Type'        => 'application/json',
+                // The spec asks every automated client to identify itself.
+                'User-Agent' => 'mindtwo/laravel-weclapp-api',
             ])
             ->timeout((int) config('weclapp-api.http.timeout', 60))
             ->connectTimeout((int) config('weclapp-api.http.connect_timeout', 10))
@@ -446,7 +458,6 @@ class WeclappClient
         }
 
         $response = match ($method) {
-            Request::METHOD_GET    => $client->get($path),
             Request::METHOD_POST   => $client->post($path, $body),
             Request::METHOD_PUT    => $client->put($path, $body),
             Request::METHOD_DELETE => $client->delete($path),

@@ -5,7 +5,8 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/mindtwo/laravel-weclapp-api.svg?style=flat-square)](https://packagist.org/packages/mindtwo/laravel-weclapp-api)
 
 A thin, typed Laravel client for the [Weclapp REST API v2](https://www.weclapp.com/api/v2.html).
-It centralises authentication, pagination, retry and rate-limiting, exposes a
+It centralises authentication, pagination, retry and, for queued calls, rate
+limiting, exposes a
 fluent per-entity endpoint API, and can mirror selected Weclapp entities into
 local tables via ready-made sync commands.
 

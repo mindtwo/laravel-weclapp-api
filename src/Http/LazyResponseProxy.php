@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Http;
 
+use ArrayAccess;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -25,8 +26,10 @@ use Throwable;
  * a write used as a plain statement still happens; only getJob() opts out.
  *
  * @mixin Response
+ *
+ * @implements ArrayAccess<string, mixed>
  */
-class LazyResponseProxy
+class LazyResponseProxy implements ArrayAccess
 {
     protected ?Response $response = null;
 
@@ -129,6 +132,26 @@ class LazyResponseProxy
     public function __toString(): string
     {
         return (string) $this->execute();
+    }
+
+    public function offsetExists(mixed $offset): bool
+    {
+        return $this->execute()->offsetExists($offset);
+    }
+
+    public function offsetGet(mixed $offset): mixed
+    {
+        return $this->execute()->offsetGet($offset);
+    }
+
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
+        $this->execute()->offsetSet($offset, $value);
+    }
+
+    public function offsetUnset(mixed $offset): void
+    {
+        $this->execute()->offsetUnset($offset);
     }
 
     /**

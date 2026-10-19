@@ -57,6 +57,16 @@ it('emits a failed completion event when the request never gets a response', fun
         && $event->response === ['error' => 'timed out']);
 });
 
+it('offers array access to the response body, like a Response does', function () {
+    Http::fake(['*/quotation' => Http::response(['id' => 'q-1'], 201)]);
+
+    $proxy = WeclappClient::quotations()->create(['customerId' => '5']);
+
+    expect(isset($proxy['id']))->toBeTrue()
+        ->and($proxy['id'])->toBe('q-1')
+        ->and(isset($proxy['missing']))->toBeFalse();
+});
+
 it('hands back an undispatched job and does not execute', function () {
     Http::fake();
 
