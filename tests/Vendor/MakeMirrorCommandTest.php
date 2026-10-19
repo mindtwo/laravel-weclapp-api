@@ -237,3 +237,40 @@ it('registers the generator only when the vendored spec is present', function ()
 it('explains where the spec should be when it is missing', function () {
     expect(SpecReader::path())->toEndWith('docs/specifications/weclapp-openapi_v2.json');
 });
+
+describe('writing', function () {
+    it('refuses before writing anything when a target exists', function () {
+        $before = glob(__DIR__.'/../../database/migrations/*.php');
+
+        $this->artisan('weclapp:make-mirror', ['resource' => 'articlePrice'])
+            ->expectsOutputToContain('src/Models/ArticlePrice.php already exists; pass --force to overwrite.')
+            ->assertExitCode(1);
+
+        // The migration used to be written first and left behind as an orphan.
+        expect(glob(__DIR__.'/../../database/migrations/*.php'))->toBe($before);
+    });
+
+    it('regenerates an existing mirror into its own migration rather than a second one', function () {
+        $this->artisan('weclapp:make-mirror', ['resource' => 'articlePrice', '--dry' => true, '--force' => true])
+            ->expectsOutputToContain('would overwrite database/migrations/2026_04_20_100010_create_weclapp_article_prices_table.php')
+            ->expectsOutputToContain('would overwrite src/Models/ArticlePrice.php')
+            ->assertExitCode(0);
+    });
+
+    it('takes the next sequence for a table that has no migration yet', function () {
+        $this->artisan('weclapp:make-mirror', ['resource' => 'opportunity', '--dry' => true])
+            ->expectsOutputToContain('would write database/migrations/2026_04_20_100012_create_weclapp_opportunities_table.php')
+            ->assertExitCode(0);
+    });
+});
+
+it('scaffolds a mirror that soft-deletes and reconciles, like the shipped ones', function () {
+    $command = app()->make(Mindtwo\LaravelWeclappApi\Commands\WeclappMakeMirrorCommand::class);
+    $blueprint = MirrorBlueprint::for('opportunity');
+    $render = fn (string $kind): string => (string) (new ReflectionMethod($command, $kind))->invoke($command, $blueprint);
+
+    expect($render('migration'))->toContain('$table->softDeletes();')
+        ->and($render('model'))->toContain('use SoftDeletes;')
+        ->and($render('model'))->toContain('$deleted_at')
+        ->and($render('registryEntry'))->toContain('reconciles: true,');
+});

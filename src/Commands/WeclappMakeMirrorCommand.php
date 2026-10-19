@@ -49,31 +49,41 @@ class WeclappMakeMirrorCommand extends Command
 
         $blueprint = $this->applyOnly($blueprint);
 
+        $migrationPath = $this->migrationPath($blueprint);
+
         $files = [
-            $this->migrationPath($blueprint)                                                 => $this->migration($blueprint),
+            $migrationPath                                                                   => $this->migration($blueprint),
             $this->packagePath('src/Models/'.$blueprint->modelClass().'.php')                => $this->model($blueprint),
             $this->packagePath('database/factories/'.$blueprint->modelClass().'Factory.php') => $this->factory($blueprint),
         ];
 
+        // Every target is checked before any is written: a run that stops on the
+        // second file would otherwise leave the first behind.
+        $existing = array_filter(array_keys($files), 'file_exists');
+
+        if ($existing !== [] && ! $this->option('force')) {
+            foreach ($existing as $path) {
+                $this->error("{$this->relative($path)} already exists; pass --force to overwrite.");
+            }
+
+            return self::FAILURE;
+        }
+
         foreach ($files as $path => $contents) {
+            $verb = in_array($path, $existing, true) ? 'overwrite' : 'write';
+
             if ($this->option('dry')) {
-                $this->line("<info>would write</info> {$this->relative($path)}");
+                $this->line("<info>would {$verb}</info> {$this->relative($path)}");
 
                 continue;
             }
 
-            if (file_exists($path) && ! $this->option('force')) {
-                $this->error("{$this->relative($path)} already exists; pass --force to overwrite.");
-
-                return self::FAILURE;
-            }
-
             file_put_contents($path, $contents);
-            $this->line("<info>wrote</info> {$this->relative($path)}");
+            $this->line("<info>{$verb}</info> {$this->relative($path)}");
         }
 
         $this->reportSkipped($blueprint);
-        $this->reportManualSteps($blueprint);
+        $this->reportManualSteps($blueprint, $migrationPath);
 
         return self::SUCCESS;
     }
@@ -113,7 +123,7 @@ class WeclappMakeMirrorCommand extends Command
         }
     }
 
-    private function reportManualSteps(MirrorBlueprint $blueprint): void
+    private function reportManualSteps(MirrorBlueprint $blueprint, string $migrationPath): void
     {
         $model = $blueprint->modelClass();
 
@@ -129,7 +139,7 @@ class WeclappMakeMirrorCommand extends Command
         $this->raw(sprintf(
             "        '%s' => '%s',",
             Str::kebab(Str::pluralStudly($model)),
-            basename($this->migrationPath($blueprint)),
+            basename($migrationPath),
         ));
         $this->newLine();
         $this->line('Then run the suite — MigrationPublishTagTest and FactorySpecEnumTest cover both.');
@@ -161,6 +171,9 @@ class WeclappMakeMirrorCommand extends Command
             $lines[] = '                ],';
         }
 
+        $lines[] = '                // The mirror soft-deletes, so a full sync may archive rows Weclapp no';
+        $lines[] = '                // longer returns; see EntitySynchronizer::reconcile().';
+        $lines[] = '                reconciles: true,';
         $lines[] = '            ),';
 
         return implode(PHP_EOL, $lines);
@@ -216,6 +229,8 @@ class WeclappMakeMirrorCommand extends Command
                     \$table->id();
         {$body}
                     \$table->timestamps();
+                    // Reconciliation marks rows Weclapp no longer returns; see EntitySynchronizer.
+                    \$table->softDeletes();
                 });
             }
 
@@ -274,6 +289,7 @@ class WeclappMakeMirrorCommand extends Command
 
         use Illuminate\\Database\\Eloquent\\Factories\\HasFactory;
         use Illuminate\\Database\\Eloquent\\Model;
+        use Illuminate\\Database\\Eloquent\\SoftDeletes;
         use Mindtwo\\LaravelWeclappApi\\Database\\Factories\\{$class}Factory;
 
         /**
@@ -281,11 +297,13 @@ class WeclappMakeMirrorCommand extends Command
         {$docBlock}
          * @property \\Illuminate\\Support\\Carbon|null \$created_at
          * @property \\Illuminate\\Support\\Carbon|null \$updated_at
+         * @property \\Illuminate\\Support\\Carbon|null \$deleted_at
          */
         class {$class} extends Model
         {
             /** @use HasFactory<{$class}Factory> */
             use HasFactory;
+            use SoftDeletes;
 
             protected \$table = '{$table}';
 
@@ -399,15 +417,19 @@ class WeclappMakeMirrorCommand extends Command
         return $distance <= 3 ? $best : null;
     }
 
-    private ?string $migrationPath = null;
-
     /**
-     * Memoised: the sequence is derived from what is on disk, so recomputing it
-     * after the file is written would report a different name than was created.
+     * An existing create migration for the table is reused, so --force
+     * regenerates in place instead of adding a second one.
      */
     private function migrationPath(MirrorBlueprint $blueprint): string
     {
-        return $this->migrationPath ??= $this->packagePath(
+        $existing = glob($this->packagePath('database/migrations/*_create_'.$blueprint->table().'_table.php')) ?: [];
+
+        if ($existing !== []) {
+            return str_replace('\\', '/', $existing[0]);
+        }
+
+        return $this->packagePath(
             'database/migrations/2026_04_20_'.$this->sequence().'_create_'.$blueprint->table().'_table.php'
         );
     }
