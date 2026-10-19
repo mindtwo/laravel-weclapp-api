@@ -10,7 +10,9 @@ function configEnvNames(): array
 {
     $source = (string) file_get_contents(__DIR__.'/../../config/weclapp-api.php');
 
-    preg_match_all("/env\('([A-Z0-9_]+)'/", $source, $matches);
+    // Tolerates whitespace after the paren, so a reformat cannot drop a variable
+    // from the two checks that depend on this list.
+    preg_match_all("/env\(\s*'([A-Z0-9_]+)'/", $source, $matches);
 
     return array_values(array_unique(array_diff($matches[1], ['APP_ENV'])));
 }
