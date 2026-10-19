@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Mindtwo\LaravelWeclappApi\Models\Article;
 use Mindtwo\LaravelWeclappApi\Models\ArticleCategory;
@@ -202,9 +203,50 @@ it('flattens the price-relevant reductionAdditions entry onto the price row', fu
 
     expect($price->weclapp_id)->toBe(152796)
         ->and($price->customer_id)->toBe(4983)
-        ->and($price->price)->toEqual('3500.0000')
+        ->and($price->price)->toEqual('3500.00000')
         ->and($price->reduction_type)->toBe('REDUCTION_PERCENT')
-        ->and($price->reduction_value)->toEqual('22.0000');
+        ->and($price->reduction_value)->toEqual('22.00000');
+});
+
+it('keeps an absolute reduction, a large amount and the fifth decimal', function () {
+    Http::fakeSequence()
+        ->push(['result' => [[
+            'id'                 => 152798,
+            'articleId'          => 7371,
+            'price'              => '0.12345',
+            'reductionAdditions' => [['id' => 152799, 'type' => 'REDUCTION_ABS', 'value' => '12345.5']],
+        ]]], 200)
+        ->push(['result' => []], 200);
+
+    $this->artisan('weclapp:sync article-prices')->assertSuccessful();
+
+    $price = ArticlePrice::query()->firstOrFail();
+
+    expect($price->price)->toEqual('0.12345')
+        ->and($price->reduction_type)->toBe('REDUCTION_ABS')
+        ->and($price->reduction_value)->toEqual('12345.50000');
+});
+
+it('mirrors the first of several reductionAdditions and says so in the log', function () {
+    Log::spy();
+    Http::fakeSequence()
+        ->push(['result' => [[
+            'id'                 => 152801,
+            'articleId'          => 7371,
+            'price'              => '100',
+            'reductionAdditions' => [
+                ['id' => 1, 'type' => 'REDUCTION_PERCENT', 'value' => '10'],
+                ['id' => 2, 'type' => 'ADDITIONAL_ABS', 'value' => '5'],
+            ],
+        ]]], 200)
+        ->push(['result' => []], 200);
+
+    $this->artisan('weclapp:sync article-prices')->assertSuccessful();
+
+    expect(ArticlePrice::query()->firstOrFail()->reduction_type)->toBe('REDUCTION_PERCENT');
+    Log::shouldHaveReceived('warning')->once()->withArgs(
+        fn (string $message, array $context) => str_contains($message, 'several reductionAdditions') && $context['price_id'] === 152801,
+    );
 });
 
 it('leaves the reduction columns null on a price without reductionAdditions', function () {
@@ -253,7 +295,7 @@ it('clears a field the customer removed in Weclapp, which the payload then simpl
         ->end_date->toBeNull()
         ->reduction_type->toBeNull()
         ->reduction_value->toBeNull()
-        ->price->toEqual('109.0000');
+        ->price->toEqual('109.00000');
 });
 
 it('flattens the flagged main image onto the article row', function () {

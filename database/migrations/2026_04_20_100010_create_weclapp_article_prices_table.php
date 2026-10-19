@@ -22,14 +22,17 @@ return new class extends Migration
             $table->string('description')->nullable();
             $table->datetime('end_date')->nullable();
             $table->datetime('last_modified')->nullable();
-            $table->decimal('price', 12, 4)->nullable();
+            // Amounts take the spec's decimal shape: up to 13 integer and 5
+            // fractional digits.
+            $table->decimal('price', 18, 5)->nullable();
             $table->string('price_scale_type')->nullable();
-            $table->decimal('price_scale_value', 12, 4)->nullable();
-            // Flattened from the nested reductionAdditions collection, which never
-            // carries more than one entry. REDUCTION_PERCENT or ADDITION_PERCENT,
-            // applied as a percentage of `price`.
+            $table->decimal('price_scale_value', 18, 5)->nullable();
+            // Flattened from the nested reductionAdditions collection. The type is
+            // one of REDUCTION_PERCENT / ADDITION_PERCENT (a percentage of `price`)
+            // or REDUCTION_ABS / ADDITIONAL_ABS (an amount in the price's currency);
+            // a consumer applying the value has to branch on it.
             $table->string('reduction_type')->nullable();
-            $table->decimal('reduction_value', 8, 4)->nullable();
+            $table->decimal('reduction_value', 18, 5)->nullable();
             $table->string('sales_channel')->nullable();
             $table->datetime('start_date')->nullable();
             $table->integer('version')->nullable();

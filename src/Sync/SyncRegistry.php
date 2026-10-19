@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Sync;
 
+use Illuminate\Support\Facades\Log;
 use Mindtwo\LaravelWeclappApi\Models\Article;
 use Mindtwo\LaravelWeclappApi\Models\ArticleCategory;
 use Mindtwo\LaravelWeclappApi\Models\ArticlePrice;
@@ -229,9 +230,9 @@ final class SyncRegistry
                     'last_modified' => 'lastModifiedDate',
                     'start_date'    => 'startDate',
                 ],
-                paths: [
-                    'reduction_type'  => 'reductionAdditions.0.type',
-                    'reduction_value' => 'reductionAdditions.0.value',
+                derive: [
+                    'reduction_type'  => fn (object $record): mixed => self::reductionField($record, 'type'),
+                    'reduction_value' => fn (object $record): mixed => self::reductionField($record, 'value'),
                 ],
                 reconciles: true,
             ),
@@ -314,6 +315,34 @@ final class SyncRegistry
         }
 
         return self::hasTag($record, $tag);
+    }
+
+    /**
+     * One field of the price's reductionAdditions entry, or null when there is
+     * none.
+     *
+     * Every price seen live carries at most one entry, and the spec sets no
+     * ordering and no maximum. Two columns can hold one entry, so the first is
+     * taken and a second is reported rather than dropped in silence: a price
+     * mirrored with only its reduction and not its surcharge is wrong in a way
+     * nobody would notice.
+     */
+    private static function reductionField(object $record, string $field): mixed
+    {
+        $entries = data_get($record, 'reductionAdditions');
+
+        if (! is_array($entries) || $entries === []) {
+            return null;
+        }
+
+        if (count($entries) > 1 && $field === 'type') {
+            Log::warning('Weclapp article price carries several reductionAdditions; only the first is mirrored.', [
+                'price_id' => data_get($record, 'id'),
+                'count'    => count($entries),
+            ]);
+        }
+
+        return data_get($entries[0], $field);
     }
 
     /**

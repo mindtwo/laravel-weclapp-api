@@ -47,8 +47,9 @@ class ArticlePriceFactory extends Factory
     }
 
     /**
-     * A price carrying the percentage reduction Weclapp keeps in
-     * reductionAdditions — the shape 96% of customer-specific prices have live.
+     * A price carrying a percentage reduction from reductionAdditions — the
+     * shape 96% of customer-specific prices have live. The other three types
+     * (ADDITION_PERCENT, REDUCTION_ABS, ADDITIONAL_ABS) are valid too.
      */
     public function reduced(?float $percent = null): static
     {
