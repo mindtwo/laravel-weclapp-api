@@ -561,8 +561,20 @@ it('returns just the requested page when the caller asks for one', function () {
     Http::assertSentCount(1);
     Http::assertSent(fn ($request) => query($request)['page'] === '3'
         && query($request)['pageSize'] === '2'
-        && ! isset(query($request)['sort'], query($request)['id-gt']));
+        && query($request)['sort'] === 'id'
+        && ! isset(query($request)['id-gt']));
 });
+
+it('keeps the caller\'s own order on a requested page', function (array $order) {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('party', ['page' => 1, ...$order]);
+
+    Http::assertSent(fn ($request) => array_intersect_key(query($request), ['sort' => 0, 'orderBy' => 0]) === $order);
+})->with([
+    'sort'    => [['sort' => '-lastModifiedDate']],
+    'orderBy' => [['orderBy' => 'company']],
+]);
 
 it('clamps a requested page size to what Weclapp allows', function () {
     Http::fake(['*' => Http::response(['result' => []], 200)]);

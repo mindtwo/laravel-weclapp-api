@@ -262,7 +262,9 @@ class WeclappClient
      *
      * The whole collection is held in memory; lazy() walks the same pages one at
      * a time. A caller that passes `page` gets exactly that page (with its own
-     * `pageSize`).
+     * `pageSize`, and `offset` if given), sorted by id unless it sorts itself.
+     * Those are offset pages: a record deleted between two calls shifts the ones
+     * behind it, so walk a collection too large to hold with lazy() instead.
      *
      * @param array<string, mixed> $params
      *
@@ -274,9 +276,12 @@ class WeclappClient
      */
     public function get(string $endpoint, array $params = []): Collection
     {
-        // A caller asking for a page gets that page, not the whole collection.
+        // A caller asking for a page gets that page, not the whole collection —
+        // sorted by id unless it orders the result itself, so page 3 means the
+        // same records on every call.
         if (isset($params['page'])) {
             $response = $this->client()->get($this->path($endpoint), [
+                ...(isset($params['sort']) || isset($params['orderBy']) ? [] : ['sort' => 'id']),
                 ...$params,
                 'pageSize' => max(1, min(1000, (int) ($params['pageSize'] ?? config('weclapp-api.page_size', 1000)))),
             ]);
