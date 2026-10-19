@@ -98,7 +98,7 @@ MINDTWO_WECLAPP_HTTP_RETRY_TIMES=3
 MINDTWO_WECLAPP_HTTP_RETRY_SLEEP=500
 MINDTWO_WECLAPP_QUEUE_CONNECTION=         # connection for queued API-call jobs; empty = default
 MINDTWO_WECLAPP_RATE_LIMIT_PER_MINUTE=100 # limit applied to queued API-call jobs
-MINDTWO_WECLAPP_WRITES_ENABLED=true       # see "Write suppression" below
+MINDTWO_WECLAPP_WRITES_ENABLED=           # blank = off on local/testing, on elsewhere; see "Write suppression"
 MINDTWO_WECLAPP_VISIBLE_TAG=              # article tag mirrored as `visible`; empty = every article
 MINDTWO_WECLAPP_LOG_EVENTS=false          # log every write's WeclappApiCallCompleted event
 MINDTWO_WECLAPP_LOG_LEVEL=info
@@ -106,8 +106,8 @@ MINDTWO_WECLAPP_LOG_CHANNEL=              # empty = the default log channel
 MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD=false
 ```
 
-The values shown are the defaults. Omit a line to keep its default; a blank
-value (`KEY=`) is treated like an omitted one.
+The values shown are the defaults (for the writes switch, blank is the default).
+Omit a line or leave it blank (`KEY=`) to keep its default.
 
 `MINDTWO_WECLAPP_VISIBLE_TAG` is evaluated when an article row is written, so
 after changing it run a full `weclapp:sync articles` — `weclapp:update` only
