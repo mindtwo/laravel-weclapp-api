@@ -11,7 +11,11 @@ use Mindtwo\LaravelWeclappApi\Models\Article;
 use Mindtwo\LaravelWeclappApi\Models\ArticleCategory;
 use Mindtwo\LaravelWeclappApi\Models\ArticlePrice;
 use Mindtwo\LaravelWeclappApi\Models\Party;
+use Mindtwo\LaravelWeclappApi\Models\Project;
 use Mindtwo\LaravelWeclappApi\Models\Quotation;
+use Mindtwo\LaravelWeclappApi\Models\SalesInvoice;
+use Mindtwo\LaravelWeclappApi\Models\SalesOrder;
+use Mindtwo\LaravelWeclappApi\Models\User;
 
 beforeEach(function () {
     config()->set('weclapp-api.base_url', 'https://tenant.weclapp.com/webapp/api/v2/');
@@ -682,4 +686,101 @@ it('maps lastModifiedDate onto article categories', function () {
     $this->artisan('weclapp:sync article-categories')->assertSuccessful();
 
     expect(ArticleCategory::query()->firstOrFail()->last_modified?->toIso8601ZuluString())->toBe('2026-10-12T21:59:59Z');
+});
+
+describe('mirrors every remaining entity', function () {
+    it('maps a user', function () {
+        Http::fakeSequence()
+            ->push(['result' => [['id' => '301', 'email' => 'jane@example.com', 'firstName' => 'Jane', 'lastName' => 'Doe', 'lastModifiedDate' => 1791842399000]]], 200)
+            ->push(['result' => []], 200);
+
+        $this->artisan('weclapp:sync users')->assertSuccessful();
+
+        $user = User::query()->firstOrFail();
+
+        expect($user->weclapp_id)->toBe(301)
+            ->and($user->email)->toBe('jane@example.com')
+            ->and($user->last_name)->toBe('Doe')
+            ->and($user->last_modified?->toIso8601ZuluString())->toBe('2026-10-12T21:59:59Z');
+    });
+
+    it('maps a sales order with its dates', function () {
+        Http::fakeSequence()
+            ->push(['result' => [[
+                'id'                => '401',
+                'customerId'        => '12345',
+                'quotationId'       => '40001',
+                'orderNumber'       => 'SO-10001',
+                'status'            => 'ORDER_CONFIRMATION_PRINTED',
+                'grossAmount'       => '119.00',
+                'netAmount'         => '100.00',
+                'orderDate'         => 1791842399000,
+                'servicePeriodFrom' => 1791842399000,
+                'version'           => '2',
+            ]]], 200)
+            ->push(['result' => []], 200);
+
+        $this->artisan('weclapp:sync sales-orders')->assertSuccessful();
+
+        $order = SalesOrder::query()->firstOrFail();
+
+        expect($order->weclapp_id)->toBe(401)
+            ->and($order->customer_id)->toBe(12345)
+            ->and($order->quotation_id)->toBe(40001)
+            ->and($order->order_number)->toBe('SO-10001')
+            ->and($order->net_amount)->toEqual('100.00')
+            ->and($order->order_date?->toIso8601ZuluString())->toBe('2026-10-12T21:59:59Z')
+            ->and($order->service_period_from)->not->toBeNull()
+            ->and($order->service_period_to)->toBeNull();
+    });
+
+    it('maps a project, taking title from name', function () {
+        Http::fakeSequence()
+            ->push(['result' => [['id' => '501', 'customerId' => '12345', 'projectNumber' => 'P-1', 'name' => 'Relaunch', 'status' => 'OPEN', 'projectStartDate' => 1791842399000]]], 200)
+            ->push(['result' => []], 200);
+
+        $this->artisan('weclapp:sync projects')->assertSuccessful();
+
+        $project = Project::query()->firstOrFail();
+
+        expect($project->weclapp_id)->toBe(501)
+            ->and($project->title)->toBe('Relaunch')
+            ->and($project->project_number)->toBe('P-1')
+            ->and($project->project_start_date)->not->toBeNull();
+    });
+
+    it('maps a sales invoice, taking currency_id from recordCurrencyId', function () {
+        Http::fakeSequence()
+            ->push(['result' => [[
+                'id'               => '601',
+                'customerId'       => '12345',
+                'salesOrderId'     => '401',
+                'recordCurrencyId' => '248',
+                'invoiceNumber'    => 'RE-10001',
+                'salesInvoiceType' => 'STANDARD_INVOICE',
+                'status'           => 'NEW',
+                'paymentStatus'    => 'OPEN',
+                'paid'             => false,
+                'grossAmount'      => '119.00',
+                'netAmount'        => '100.00',
+                'invoiceDate'      => 1791842399000,
+                'shippingDate'     => 1791842399000,
+                'servicePeriodTo'  => 1791842399000,
+            ]]], 200)
+            ->push(['result' => []], 200);
+
+        $this->artisan('weclapp:sync sales-invoices')->assertSuccessful();
+
+        $invoice = SalesInvoice::query()->firstOrFail();
+
+        expect($invoice->weclapp_id)->toBe(601)
+            ->and($invoice->currency_id)->toBe(248)
+            ->and($invoice->sales_order_id)->toBe(401)
+            ->and($invoice->paid)->toBeFalse()
+            ->and($invoice->sales_invoice_type)->toBe('STANDARD_INVOICE')
+            ->and($invoice->invoice_date?->toIso8601ZuluString())->toBe('2026-10-12T21:59:59Z')
+            ->and($invoice->shipping_date)->not->toBeNull()
+            ->and($invoice->service_period_to)->not->toBeNull()
+            ->and($invoice->pricing_date)->toBeNull();
+    });
 });
