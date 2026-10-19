@@ -165,3 +165,6 @@ Thumbs.db
 # nested build directory, which is more than intended.
 /build
 report.junit.xml
+
+# Local code-review output (mindtwo-dev:review-code)
+/.code-review/
