@@ -177,6 +177,45 @@ it('exposes every endpoint through a client accessor and a facade annotation', f
     expect($problems)->toBe([]);
 });
 
+// The facade's @method lines are what IDEs and a consumer's static analysis see.
+// A public method missing there, or one documented with a stale parameter list,
+// surfaces as "unknown method/parameter" in the consuming app, not here.
+it('annotates every public client method on the facade with its real parameters', function () {
+    $client = new ReflectionClass(WeclappClient::class);
+    $facade = (string) file_get_contents(__DIR__.'/../../src/Facades/WeclappClient.php');
+
+    // Plumbing the proxy and the job use; not for consumers, so not on the facade.
+    $internal = ['send', 'isMutating', 'recordSuppressedWrite'];
+
+    $problems = [];
+
+    foreach ($client->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+        $name = $method->getName();
+
+        if (in_array($name, $internal, true) || $method->isConstructor()
+            || str_starts_with((string) $method->getReturnType(), 'Mindtwo\\LaravelWeclappApi\\Http\\Endpoints\\')) {
+            continue;
+        }
+
+        preg_match('/@method static [^\n]* '.preg_quote($name, '/').'\(([^)]*)\)/', $facade, $match);
+
+        if ($match === []) {
+            $problems[] = "{$name}: no @method line on the facade";
+
+            continue;
+        }
+
+        $documented = preg_match_all('/\$(\w+)/', $match[1], $params) ? $params[1] : [];
+        $real = array_map(fn (ReflectionParameter $p): string => $p->getName(), $method->getParameters());
+
+        if ($documented !== $real) {
+            $problems[] = sprintf('%s: facade documents (%s), client has (%s)', $name, implode(', ', $documented), implode(', ', $real));
+        }
+    }
+
+    expect($problems)->toBe([]);
+});
+
 it('registers every endpoint as a singleton in the service provider', function () {
     $registered = (new ReflectionClass(Mindtwo\LaravelWeclappApi\WeclappApiServiceProvider::class))
         ->getConstant('ENDPOINTS');
