@@ -34,9 +34,12 @@ function yamlSpec(): array
  * integral floats read as ints, because the YAML writes `maxLength: 1000.0`
  * where the JSON has `1000`.
  *
+ * Directly under `properties` the keys are field names, not prose — a field
+ * called `description`, `title` or `tags` is kept.
+ *
  * @param list<string> $drop
  */
-function structural(mixed $node, array $drop): mixed
+function structural(mixed $node, array $drop, bool $isPropertyMap = false): mixed
 {
     if (is_float($node) && floor($node) === $node) {
         return (int) $node;
@@ -49,11 +52,11 @@ function structural(mixed $node, array $drop): mixed
     $out = [];
 
     foreach ($node as $key => $value) {
-        if (is_string($key) && in_array($key, $drop, true)) {
+        if (! $isPropertyMap && is_string($key) && in_array($key, $drop, true)) {
             continue;
         }
 
-        $out[$key] = structural($value, $drop);
+        $out[$key] = structural($value, $drop, $key === 'properties');
     }
 
     if (array_keys($out) !== range(0, count($out) - 1)) {
@@ -64,6 +67,18 @@ function structural(mixed $node, array $drop): mixed
 }
 
 const PROSE = ['description', 'summary', 'title', 'example', 'externalDocs'];
+
+it('drops prose but keeps fields named like it', function () {
+    $schema = ['description' => 'prose', 'properties' => [
+        'description' => ['maxLength' => 255, 'description' => 'prose'],
+        'tags'        => ['type' => 'array'],
+    ]];
+
+    expect(structural($schema, [...PROSE, 'tags']))->toBe(['properties' => [
+        'description' => ['maxLength' => 255],
+        'tags'        => ['type' => 'array'],
+    ]]);
+});
 
 it('vendors both spec formats', function () {
     expect(file_exists(specDir().'/weclapp-openapi_v2.json'))->toBeTrue()
