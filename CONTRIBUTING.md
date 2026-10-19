@@ -53,12 +53,13 @@ Have an idea for a new feature or improvement? Create an issue describing:
 
 ### 3. Add New Weclapp API Endpoints
 
-The package doesn't cover all Weclapp API endpoints yet. You can help by:
+Every resource the vendored spec documents already has a typed class — the
+conformance test insists on it. What is left to add:
 
-- Implementing missing endpoints (
+- a class for a resource that a refreshed spec introduces (
   see [Adding New Endpoints](#adding-new-endpoints))
-- Ensuring the implementation follows our patterns
-- Adding comprehensive documentation
+- methods for sub-resource actions the base class cannot express
+- mirrors for entities the application reads locally (see below)
 
 ### 4. Improve Documentation
 
@@ -195,10 +196,16 @@ already provides `query()` / `find()` / `count()` (reads) and `create()` /
 new endpoint is a three-line subclass — you do **not** re-implement the CRUD
 methods.
 
+A new class is only ever needed after the vendored spec was refreshed and now
+documents a resource at `/{resource}/id/{id}` that has no class yet — run the
+suite and `EndpointSpecConformanceTest` names each one. A resource without that
+record path (`/salesChannel/activeSalesChannels`, for instance) is not a CRUD
+resource and gets no class; reach it through `WeclappClient::get()`.
+
 ### 1. Create the endpoint class
 
 Create a file in `src/Http/Endpoints/` that declares the Weclapp resource
-segment:
+segment. This is what the shipped `Ticket` looks like:
 
 ```php
 <?php
@@ -207,9 +214,9 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Http\Endpoints;
 
-class SalesChannel extends Endpoint
+class Ticket extends Endpoint
 {
-    protected string $path = 'salesChannel';
+    protected string $path = 'ticket';
 }
 ```
 
@@ -235,7 +242,7 @@ class SalesOpenItem extends Endpoint
 
 - Add the class to the `ENDPOINTS` list in `WeclappApiServiceProvider` so it is
   bound as a singleton.
-- Add an accessor to `WeclappClient` (e.g. `public function salesChannels(): SalesChannel { return app(SalesChannel::class); }`).
+- Add an accessor to `WeclappClient` (e.g. `public function tickets(): Ticket { return app(Ticket::class); }`).
 - Add a matching `@method` line to the `WeclappClient` facade docblock.
 
 All three are enforced by `tests/Vendor/EndpointSpecConformanceTest.php`, which
@@ -297,8 +304,9 @@ to `string()`.
 
 **There are no example responses.** Neither file contains a single `example` or
 `examples` key. The spec gives you shape, never values, so it cannot tell you
-which fields this tenant actually populates. That still needs a live read — see
-`bin/verify-live-paths.sh`.
+which fields this tenant actually populates. That still needs a live read of the
+collection (with `serializeNulls=true`, or the whole collection — see the
+`weclapp-openapi-spec` skill); `bin/verify-live-paths.sh` does not do that.
 
 ### How endpoint classes are validated
 
@@ -325,11 +333,12 @@ while permissions grant it and withhold create), so neither reflects the API
 contract — both describe one tenant's licensing and one user's rights. Encoding
 either would break the package for consumers with different rights.
 
-If you ever have a token with wider access, re-run the checks in
-`bin/verify-live-paths.sh` (read-only, `GET` requests only; it reads
-`MINDTWO_WECLAPP_URL` and `MINDTWO_WECLAPP_API_KEY` from `.env`) and compare
-`/meta/resources` against the class list; that is the only way to shrink the
-spec-only set.
+If you ever have a token with wider access, re-run `bin/verify-live-paths.sh`
+(read-only `GET` probes of a handful of paths — the party views, the record-path
+convention, the id-cursor pagination; it reads `MINDTWO_WECLAPP_URL` and
+`MINDTWO_WECLAPP_API_KEY` from `.env`) and, separately, fetch `/meta/resources`
+with `curl` and compare it against the class list; the script does not call it.
+That comparison is the only way to shrink the spec-only set.
 
 ### 3. Method contract
 
@@ -408,10 +417,16 @@ Trim before publishing, and add relations by hand.
 Doing it manually instead:
 
 1. Add a `weclapp_*` migration + Eloquent model + factory (mirror the existing
-   ones under `database/migrations`, `src/Models`, `database/factories`).
-2. Add a `SyncDefinition` entry to `Sync\SyncRegistry` mapping the endpoint,
-   model, the column → API-field `map`, epoch-ms `dates`, the match `key`, and
-   any static `defaults`.
+   ones under `database/migrations`, `src/Models`, `database/factories`). The
+   migration carries `weclapp_id` as `NOT NULL UNIQUE` and `softDeletes()`; the
+   model uses `SoftDeletes` — reconciliation archives through it.
+2. Add a `SyncDefinition` entry to `Sync\SyncRegistry`: `endpoint`, `model`,
+   the column → API-field `map`, epoch-ms `dates` (always including
+   `last_modified => lastModifiedDate`, which `weclapp:update` filters on),
+   `paths` for one scalar inside a nested value, `derive` closures for anything a
+   dot-path cannot address, static `defaults`, `filters` that narrow a shared
+   resource, the match `key`, and `reconciles: true` when the definition owns
+   the whole table.
 3. Register the migration in `WeclappApiServiceProvider::MIGRATIONS` so it gets a
    `weclapp-api-migrations-{entity}` publish tag. `MigrationPublishTagTest` fails
    if you forget.
@@ -447,10 +462,10 @@ Create test files in the `tests/` directory:
 use Illuminate\Support\Facades\Http;
 use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 
-it('creates a resource', function () {
-    Http::fake(['*/salesChannel' => Http::response(['id' => '1'], 201)]);
+it('creates a ticket', function () {
+    Http::fake(['*/ticket' => Http::response(['id' => '1'], 201)]);
 
-    $response = WeclappClient::salesChannels()->create(['name' => 'Test Resource']);
+    $response = WeclappClient::tickets()->create(['subject' => 'Test ticket']);
 
     expect($response->status())->toBe(201);
 });
