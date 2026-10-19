@@ -42,6 +42,7 @@ class MirrorBlueprint
             $columns[] = $column;
         }
 
+        // Ids first, then alphabetically, so a generated migration reads like the shipped ones.
         usort($columns, fn (array $a, array $b): int => [$b['is_id'], $a['name']] <=> [$a['is_id'], $b['name']]);
 
         return new self($resource, $columns, $skipped);
@@ -135,7 +136,7 @@ class MirrorBlueprint
         $enum = SpecReader::enumValues($property);
 
         if ($type === null && isset($property['$ref']) && $enum === null) {
-            return 'reference to another entity';
+            return 'embedded object';
         }
 
         // The API's own id becomes weclapp_id, the table keeping its own key, and
@@ -162,12 +163,14 @@ class MirrorBlueprint
             $isIdentifier                                  => ['unsignedBigInteger', 'integer'],
             $name === 'version'                            => ['integer', 'integer'],
             $type === 'integer' && $format === 'timestamp' => ['datetime', 'datetime'],
+            $type === 'integer' && $format === 'int64'     => ['bigInteger', 'integer'],
             $type === 'integer'                            => ['integer', 'integer'],
             $type === 'boolean'                            => ['boolean', 'boolean'],
-            $type === 'number' || $format === 'decimal'    => ['decimal', 'decimal:4'],
-            $enum !== null                                 => ['string', null],
-            is_int($maxLength) && $maxLength <= 255        => ['string', null],
-            default                                        => ['text', null],
+            // The spec's decimal pattern allows 13 integer and 5 fractional digits.
+            $type === 'number' || $format === 'decimal' => ['decimal', 'decimal:5'],
+            $enum !== null                              => ['string', null],
+            is_int($maxLength) && $maxLength <= 255     => ['string', null],
+            default                                     => ['text', null],
         };
 
         return [
@@ -176,7 +179,7 @@ class MirrorBlueprint
             'migration'  => $migration,
             'cast'       => $cast,
             'enum'       => $enum,
-            'max_length' => is_int($maxLength) && $maxLength <= 255 && $maxLength !== 255 ? $maxLength : null,
+            'max_length' => is_int($maxLength) && $maxLength < 255 ? $maxLength : null,
             'is_date'    => $migration === 'datetime',
             'is_id'      => $isIdentifier,
         ];

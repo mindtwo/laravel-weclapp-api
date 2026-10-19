@@ -406,7 +406,7 @@ entity reference, unbounded `*Id` strings and `version` → integer columns desp
 being serialised as strings, while a bounded or typed `*Id` such as
 `xRechnungLeitwegId` keeps its own type), sizes strings from `maxLength`,
 seeds factory values from the property's enum, and drops nested collections and
-entity references with a printed reason. It then prints the `SyncRegistry` entry
+embedded objects with a printed reason. It then prints the `SyncRegistry` entry
 and `MIGRATIONS` line to paste, since editing those files automatically is more
 trouble than it is worth.
 

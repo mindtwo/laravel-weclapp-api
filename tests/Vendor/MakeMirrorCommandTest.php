@@ -63,13 +63,13 @@ it('types a field as an id from the spec, not from its name', function () {
         ->and($rule['valid_vat_id']['migration'])->toBe('boolean');
 });
 
-it('skips nested collections and entity references', function () {
+it('skips nested collections and embedded objects', function () {
     $blueprint = MirrorBlueprint::for('salesInvoice');
 
     expect($blueprint->skipped)->toHaveKey('salesInvoiceItems')
         ->and($blueprint->skipped['salesInvoiceItems'])->toBe('nested collection')
         ->and($blueprint->skipped)->toHaveKey('deliveryAddress')
-        ->and($blueprint->skipped['deliveryAddress'])->toBe('reference to another entity')
+        ->and($blueprint->skipped['deliveryAddress'])->toBe('embedded object')
         ->and(array_column($blueprint->columns, 'name'))->not->toContain('sales_invoice_items');
 });
 
@@ -179,7 +179,7 @@ it('derives a usable blueprint for every resource in the spec', function () {
         foreach ($blueprint->columns as $column) {
             expect($column['name'])->toMatch('/^[a-z][a-z0-9_]*$/', "{$resource}: bad column name");
             expect($column['migration'])->toBeIn([
-                'unsignedBigInteger', 'integer', 'boolean', 'decimal', 'string', 'text', 'datetime',
+                'unsignedBigInteger', 'bigInteger', 'integer', 'boolean', 'decimal', 'string', 'text', 'datetime',
             ]);
         }
 
@@ -254,7 +254,7 @@ it('generates syntactically valid php for every mirrored resource', function (st
     // A php -l cross-check, kept in case php-parser is absent.
 })->with(['articlePrice', 'party']);
 
-it('registers the generator only when the vendored spec is present', function () {
+it('registers the generator in a checkout, where the vendored spec is present', function () {
     // docs/ is export-ignored, so a composer install has no spec and the command
     // would fail on read -- and would write into vendor/ if it did not. It is
     // development tooling; a git checkout has the spec, a consumer install does not.
@@ -262,7 +262,7 @@ it('registers the generator only when the vendored spec is present', function ()
         ->and(array_keys(Artisan::all()))->toContain('weclapp:make-mirror');
 });
 
-it('explains where the spec should be when it is missing', function () {
+it('reads the vendored spec from docs/specifications', function () {
     expect(SpecReader::path())->toEndWith('docs/specifications/weclapp-openapi_v2.json');
 });
 

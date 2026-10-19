@@ -5,36 +5,36 @@
 # Sends GET requests only — no data is created, changed or deleted.
 #
 # URL and token are read from .env (MINDTWO_WECLAPP_URL, MINDTWO_WECLAPP_API_KEY)
-# unless WECLAPP_URL / WECLAPP_TOKEN are already exported. The token is never
+# unless the same variables are already exported. The token is never
 # printed.
 #
 # Usage (from the repository root):
 #   bash bin/verify-live-paths.sh
 #
-#   WECLAPP_URL="https://your-tenant.weclapp.com/webapp/api/v2" \
+#   MINDTWO_WECLAPP_URL="https://your-tenant.weclapp.com/webapp/api/v2" \
 #   bash bin/verify-live-paths.sh
 
 set -uo pipefail
 
 if [ -f .env ]; then
-  if [ -z "${WECLAPP_TOKEN:-}" ]; then
-    WECLAPP_TOKEN=$(sed -n 's/^MINDTWO_WECLAPP_API_KEY=//p' .env | head -1 | tr -d '"'"'"'\r')
+  if [ -z "${MINDTWO_WECLAPP_API_KEY:-}" ]; then
+    MINDTWO_WECLAPP_API_KEY=$(sed -n 's/^MINDTWO_WECLAPP_API_KEY=//p' .env | head -1 | tr -d '"'"'"'\r')
   fi
-  if [ -z "${WECLAPP_URL:-}" ]; then
-    WECLAPP_URL=$(sed -n 's/^MINDTWO_WECLAPP_URL=//p' .env | head -1 | tr -d '"'"'"'\r')
+  if [ -z "${MINDTWO_WECLAPP_URL:-}" ]; then
+    MINDTWO_WECLAPP_URL=$(sed -n 's/^MINDTWO_WECLAPP_URL=//p' .env | head -1 | tr -d '"'"'"'\r')
   fi
 fi
 
-: "${WECLAPP_URL:?set WECLAPP_URL (e.g. https://tenant.weclapp.com/webapp/api/v2)}"
-: "${WECLAPP_TOKEN:?no token — set MINDTWO_WECLAPP_API_KEY in .env or export WECLAPP_TOKEN}"
+: "${MINDTWO_WECLAPP_URL:?set MINDTWO_WECLAPP_URL (e.g. https://tenant.weclapp.com/webapp/api/v2)}"
+: "${MINDTWO_WECLAPP_API_KEY:?no token — set MINDTWO_WECLAPP_API_KEY in .env or export MINDTWO_WECLAPP_API_KEY}"
 
-BASE="${WECLAPP_URL%/}"
+BASE="${MINDTWO_WECLAPP_URL%/}"
 
 probe() {
   local label="$1" path="$2"
   local code
   code=$(curl -s --compressed -o /dev/null -w '%{http_code}' \
-    -H "AuthenticationToken: ${WECLAPP_TOKEN}" \
+    -H "AuthenticationToken: ${MINDTWO_WECLAPP_API_KEY}" \
     -H 'Accept: application/json' \
     "${BASE}/${path}")
   printf '%-52s %-46s %s\n' "$label" "/$path" "$code"
@@ -58,9 +58,11 @@ probe 'salesOrder in project mode'          'salesOrder?projectModeActive-eq=tru
 
 echo
 echo '# Record-path convention (expect 200 for /id/{id}, 404 for the bare form)'
-FIRST_ID=$(curl -s --compressed -H "AuthenticationToken: ${WECLAPP_TOKEN}" -H 'Accept: application/json' \
-  "${BASE}/article?pageSize=1" \
+FIRST_ID=$(curl -s --compressed -H "AuthenticationToken: ${MINDTWO_WECLAPP_API_KEY}" -H 'Accept: application/json' \
+  "${BASE}/article?pageSize=1&properties=id" \
   | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\{0,1\}\([0-9]\{1,\}\).*/\1/p' | head -1)
+# properties=id keeps nested ids (images, prices) out of the response, so the
+# first "id" the sed finds is the article's own.
 
 if [ -n "${FIRST_ID}" ]; then
   probe "article/id/${FIRST_ID} (spec shape)"  "article/id/${FIRST_ID}"

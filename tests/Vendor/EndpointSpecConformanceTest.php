@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\Endpoint;
+use Mindtwo\LaravelWeclappApi\Spec\SpecReader;
 use Mindtwo\LaravelWeclappApi\WeclappClient;
 
 // There is one trivial endpoint class per Weclapp resource, so the risk is not
@@ -16,37 +17,6 @@ use Mindtwo\LaravelWeclappApi\WeclappClient;
 // but responds live, so it is exempt from the spec-derived assertions.
 const UNDOCUMENTED = ['project'];
 
-function spec(): array
-{
-    static $spec;
-
-    return $spec ??= json_decode(
-        (string) file_get_contents(__DIR__.'/../../docs/specifications/weclapp-openapi_v2.json'),
-        true,
-        flags: JSON_THROW_ON_ERROR,
-    );
-}
-
-/**
- * Resources the spec exposes as CRUD, i.e. addressable as /{resource}/id/{id}.
- *
- * @return list<string>
- */
-function specResources(): array
-{
-    $resources = [];
-
-    foreach (array_keys(spec()['paths']) as $path) {
-        $segments = explode('/', trim($path, '/'));
-
-        if (count($segments) === 3 && $segments[1] === 'id' && $segments[2] === '{id}') {
-            $resources[$segments[0]] = true;
-        }
-    }
-
-    return array_keys($resources);
-}
-
 /**
  * Write operations the spec documents for a resource.
  *
@@ -54,7 +24,7 @@ function specResources(): array
  */
 function specWrites(string $resource): array
 {
-    $paths = spec()['paths'];
+    $paths = SpecReader::spec()['paths'];
     $writes = [];
 
     if (isset($paths['/'.$resource]['post'])) {
@@ -98,7 +68,7 @@ function endpointPath(Endpoint $endpoint): string
 it('has a class for every documented CRUD resource', function () {
     $covered = array_values(array_map(endpointPath(...), endpoints()));
 
-    expect(array_values(array_diff(specResources(), $covered)))->toBe([]);
+    expect(array_values(array_diff(SpecReader::resources(), $covered)))->toBe([]);
 });
 
 it('points every endpoint at a documented resource', function () {
@@ -111,7 +81,7 @@ it('points every endpoint at a documented resource', function () {
             continue;
         }
 
-        if (! array_key_exists('/'.$path.'/id/{id}', spec()['paths'])) {
+        if (! array_key_exists('/'.$path.'/id/{id}', SpecReader::spec()['paths'])) {
             $undocumented[] = class_basename($class).' => '.$path;
         }
     }

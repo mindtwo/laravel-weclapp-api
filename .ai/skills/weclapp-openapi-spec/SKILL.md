@@ -72,9 +72,12 @@ $resolve = function (string $name, array $seen = []) use (&$resolve, $schemas): 
 ```
 
 **Never conclude "the spec has no schemas" from an unresolved read.** That
-mistake was made once and led to a wrong recommendation. 121 of 157 top-level
-resources resolve to a schema; the other 36 are lookup lists whose responses
-`$ref` a shared `customValue`.
+mistake was made once and led to a wrong recommendation. All 152 resources
+addressable as `/{resource}/id/{id}` resolve to a schema — 119 under their own
+name, 29 lookup lists through the shared `customValue`, and the four
+`shipmentReturn*` resources through `shipmentReturnDescription`. The schema a
+resource uses is the `$ref` of its GET-by-id 200 response; `SpecReader::schemaFor()`
+reads it, so never assume schema name equals resource name.
 
 ## Enums are `$ref`s, not inline
 

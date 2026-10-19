@@ -185,7 +185,7 @@ class WeclappMakeMirrorCommand extends Command
 
         foreach ($blueprint->columns as $column) {
             $call = match ($column['migration']) {
-                'decimal' => sprintf("\$table->decimal('%s', 15, 4)", $column['name']),
+                'decimal' => sprintf("\$table->decimal('%s', 18, 5)", $column['name']),
                 'string'  => $column['max_length'] !== null
                     ? sprintf("\$table->string('%s', %d)", $column['name'], $column['max_length'])
                     : sprintf("\$table->string('%s')", $column['name']),
@@ -346,9 +346,12 @@ class WeclappMakeMirrorCommand extends Command
                 $column['cast'] === 'integer'   => '$this->faker->numberBetween(1, 100)',
                 $column['cast'] === 'boolean'   => '$this->faker->boolean()',
                 $column['cast'] === 'datetime'  => '$this->faker->dateTime()',
-                $column['cast'] === 'decimal:4' => '$this->faker->randomFloat(4, 1, 10000)',
+                $column['cast'] === 'decimal:5' => '$this->faker->randomFloat(5, 1, 10000)',
                 $column['migration'] === 'text' => '$this->faker->sentence()',
-                default                         => '$this->faker->word()',
+                // A bounded string gets a value that fits: MySQL and Postgres refuse
+                // a longer one, SQLite does not, so the package suite would not notice.
+                $column['max_length'] !== null => sprintf("\$this->faker->lexify('%s')", str_repeat('?', min((int) $column['max_length'], 10))),
+                default                        => '$this->faker->word()',
             };
 
             $lines[] = sprintf(
