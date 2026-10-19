@@ -297,16 +297,25 @@ never fails or re-runs the call it was told about.
 ### Low-level client
 
 Every documented resource has a typed class, so the generic methods are for what
-falls outside that: the undocumented corners of the API, and the ~190 nested
-action paths. They hit any resource:
+falls outside that: undocumented resources, ad-hoc reads, and the ~190 nested
+action paths. `get()`, `find()` and `count()` work on resource collections and
+records; actions go through `post()`, `download()` or the raw `client()`:
 
 ```php
-WeclappClient::get('salesChannel');                       // paginated Collection
-WeclappClient::find('unit', 5);                           // ?object
-WeclappClient::count('article');                          // int
-WeclappClient::post('quotation', $payload, dryRun: true); // array
-WeclappClient::put('warehouseStock', 7, $payload);        // array
-WeclappClient::delete('ticket', 9);                       // bool
+WeclappClient::get('article', ['articleNumber-eq' => 'A-1']); // paginated Collection
+WeclappClient::find('unit', 5);                               // ?object
+WeclappClient::count('article');                              // int
+WeclappClient::post('quotation', $payload, dryRun: true);     // array
+WeclappClient::put('article', 7, $payload);                   // array
+WeclappClient::delete('ticket', 9);                           // bool
+```
+
+`get()` pages by id cursor (`sort=id`, `id-gt`), so it suits collections whose
+records carry an `id`. A one-off action read that takes no paging parameters
+goes through the raw client, which sends exactly what you give it:
+
+```php
+WeclappClient::client()->get('salesChannel/activeSalesChannels')->json('result');
 ```
 
 `find()`, `put()` and `delete()` take the id separately because Weclapp

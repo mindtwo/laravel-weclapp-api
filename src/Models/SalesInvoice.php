@@ -83,6 +83,11 @@ class SalesInvoice extends Model
     }
 
     /**
+     * The order an ordinary invoice was raised from. A collective invoice
+     * covers several orders: Weclapp lists them in `salesOrders[]` and leaves
+     * `salesOrderId` empty, so this is null for it and the list exists only
+     * in the API record.
+     *
      * @return BelongsTo<SalesOrder, $this>
      */
     public function salesOrder(): BelongsTo
