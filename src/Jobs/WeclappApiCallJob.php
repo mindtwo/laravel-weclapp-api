@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Jobs;
 
+use DateTimeInterface;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -12,6 +13,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
+use Illuminate\Queue\Middleware\SkipIfBatchCancelled;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
@@ -20,13 +22,32 @@ use Mindtwo\LaravelWeclappApi\WeclappClient;
 use Symfony\Component\HttpFoundation\Request;
 use Throwable;
 
+/**
+ * One Weclapp request on the queue.
+ *
+ * The job is bounded by time, not by a count of attempts: the rate limiter
+ * puts a throttled job back on the queue, and every release counts as an
+ * attempt, so a backlog a few minutes long would exhaust a fixed `$tries`
+ * before a single request went out. Inside the budget it releases itself on a
+ * 429, a 5xx or a connection error, with Weclapp's Retry-After when given; a
+ * 4xx is a refusal a retry cannot change and fails at once.
+ */
 class WeclappApiCallJob implements ShouldQueue
 {
     use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 5;
+    /**
+     * Genuine exceptions, as opposed to attempts: the throttle and the
+     * handled failures below release the job without throwing.
+     */
+    public int $maxExceptions = 3;
 
-    public int $timeout = 60;
+    /**
+     * Seconds the worker lets one attempt run. Derived from the client's own
+     * timeouts so the worker never kills a request Weclapp is still answering,
+     * which the queue would then send a second time.
+     */
+    public int $timeout;
 
     /**
      * @param array<string, mixed> $body
@@ -43,6 +64,18 @@ class WeclappApiCallJob implements ShouldQueue
         if (is_string($connection) && $connection !== '') {
             $this->onConnection($connection);
         }
+
+        $this->timeout = (int) config('weclapp-api.http.timeout', 60)
+            + (int) config('weclapp-api.http.connect_timeout', 10)
+            + 5;
+    }
+
+    /**
+     * How long after dispatch the call may still be retried.
+     */
+    public function retryUntil(): DateTimeInterface
+    {
+        return now()->addHour();
     }
 
     public function handle(): void
@@ -55,7 +88,9 @@ class WeclappApiCallJob implements ShouldQueue
             return;
         }
 
-        $client = $api->client();
+        // One request per attempt: retrying is this job's business, through
+        // release() and the time budget, not the transport's.
+        $client = $api->client()->retry(1, 0, throw: false);
 
         if (! empty($this->queryParams)) {
             $client = $client->withQueryParameters($this->queryParams);
@@ -70,7 +105,7 @@ class WeclappApiCallJob implements ShouldQueue
                 default                => throw new \InvalidArgumentException("Unsupported HTTP method: {$this->method}"),
             };
         } catch (ConnectionException $e) {
-            if ($this->attempts() < $this->tries) {
+            if ($this->withinBudget()) {
                 $backoff = $this->backoff();
 
                 $this->release($backoff[$this->attempts() - 1] ?? (int) end($backoff));
@@ -97,7 +132,7 @@ class WeclappApiCallJob implements ShouldQueue
 
         $status = $response->status();
 
-        if (($status === 429 || $status >= 500) && $this->attempts() < $this->tries) {
+        if (($status === 429 || $status >= 500) && $this->withinBudget()) {
             $this->release($this->retryAfterSeconds($response));
 
             return;
@@ -117,7 +152,7 @@ class WeclappApiCallJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        return [new RateLimited('weclapp-api-jobs')];
+        return [new SkipIfBatchCancelled, new RateLimited('weclapp-api-jobs')];
     }
 
     protected function isMutating(): bool
@@ -126,6 +161,8 @@ class WeclappApiCallJob implements ShouldQueue
     }
 
     /**
+     * Seconds to wait after a connection error, by attempt.
+     *
      * @return array<int, int>
      */
     public function backoff(): array
@@ -146,6 +183,17 @@ class WeclappApiCallJob implements ShouldQueue
             0,
             false,
         );
+    }
+
+    /**
+     * Whether the dispatch-time budget from retryUntil() still allows a release.
+     * Run outside a worker there is no budget to check.
+     */
+    private function withinBudget(): bool
+    {
+        $until = $this->job?->retryUntil();
+
+        return $until === null || $until > now()->getTimestamp();
     }
 
     private function retryAfterSeconds(Response $response): int

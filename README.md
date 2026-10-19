@@ -263,6 +263,11 @@ $job = WeclappClient::quotations()->create($payload)->getJob();
 dispatch($job); // or batch several with Bus::batch([...])
 ```
 
+A queued call is throttled by the `weclapp-api-jobs` rate limiter and keeps
+being retried — after a throttle, a `429`, a `5xx` or a connection error — for
+up to an hour from dispatch before it fails; a refusal (`4xx`) fails at once.
+A call whose batch was cancelled is skipped.
+
 Either path emits a `Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted`
 event on success and failure, so consumers can react without threading return
 values through the call stack.
