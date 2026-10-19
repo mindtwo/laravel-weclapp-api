@@ -46,6 +46,23 @@ it('derives the article price columns the hand-written mirror uses', function ()
         ->and($columns['start_date']['is_date'])->toBeTrue();
 });
 
+it('types a field as an id from the spec, not from its name', function () {
+    $party = collect(MirrorBlueprint::for('party')->columns)->keyBy('name');
+    $category = collect(MirrorBlueprint::for('articleCategory')->columns)->keyBy('name');
+    $rule = collect(MirrorBlueprint::for('taxDeterminationRule')->columns)->keyBy('name');
+
+    // Marked `x-weclapp.entity`, and an unmarked unbounded `*Id` string: references.
+    expect($party['responsible_user_id']['migration'])->toBe('unsignedBigInteger')
+        ->and($party['responsible_user_id']['is_id'])->toBeTrue()
+        ->and($category['image_id']['migration'])->toBe('unsignedBigInteger')
+        // A Leitweg-ID is a bounded string like 04011000-1234512345-06; an integer
+        // column would refuse it on MySQL and mangle it elsewhere.
+        ->and($party['x_rechnung_leitweg_id']['migration'])->toBe('string')
+        ->and($party['x_rechnung_leitweg_id']['max_length'])->toBe(46)
+        ->and($party['x_rechnung_leitweg_id']['is_id'])->toBeFalse()
+        ->and($rule['valid_vat_id']['migration'])->toBe('boolean');
+});
+
 it('skips nested collections and entity references', function () {
     $blueprint = MirrorBlueprint::for('salesInvoice');
 

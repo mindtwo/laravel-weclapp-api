@@ -385,8 +385,10 @@ php artisan weclapp:make-mirror ticket --only=id,subject,ticketNumber
 ```
 
 It resolves the `allOf` chain, maps types (`format: timestamp` → `datetime` and
-into `dates`; `format: decimal` → `decimal`; `*Id` and `version` → integer
-columns despite being serialised as strings), sizes strings from `maxLength`,
+into `dates`; `format: decimal` → `decimal`; `id`, fields the spec marks as an
+entity reference, unbounded `*Id` strings and `version` → integer columns despite
+being serialised as strings, while a bounded or typed `*Id` such as
+`xRechnungLeitwegId` keeps its own type), sizes strings from `maxLength`,
 seeds factory values from the property's enum, and drops nested collections and
 entity references with a printed reason. It then prints the `SyncRegistry` entry
 and `MIGRATIONS` line to paste, since editing those files automatically is more

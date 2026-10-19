@@ -149,8 +149,14 @@ class MirrorBlueprint
         $maxLength = $property['maxLength'] ?? null;
 
         // Weclapp serialises every numeric id and the optimistic-lock counter as
-        // a string, so type alone would give varchar columns for integers.
-        $isIdentifier = $name === 'id' || str_ends_with($name, 'Id');
+        // a string, so type alone would give varchar columns for integers. The
+        // spec marks a reference with `x-weclapp.entity`; the unmarked `*Id`
+        // strings without a length are references too (parentItemId, imageId),
+        // while a bounded or typed one is data that merely ends in "Id"
+        // (xRechnungLeitwegId, trackingId, validVatId).
+        $isIdentifier = $name === 'id'
+            || isset($property['x-weclapp']['entity'])
+            || (str_ends_with($name, 'Id') && $type === 'string' && $maxLength === null);
 
         [$migration, $cast] = match (true) {
             $isIdentifier                                  => ['unsignedBigInteger', 'integer'],
