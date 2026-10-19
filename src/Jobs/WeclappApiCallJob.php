@@ -26,8 +26,10 @@ use Throwable;
  * One Weclapp request on the queue.
  *
  * Bounded by time rather than attempts, because every rate-limit release
- * counts as an attempt. Within the budget it releases itself on a 429, a 5xx
- * or a connection error; a 4xx fails at once.
+ * counts as an attempt. Within the budget it releases itself on a 429, and on
+ * a 5xx or a connection error only for PUT/DELETE: those leave it open whether
+ * Weclapp processed the request, and re-sending a POST could create a second
+ * record. Every other failure fails at once.
  */
 class WeclappApiCallJob implements ShouldQueue
 {
@@ -86,7 +88,7 @@ class WeclappApiCallJob implements ShouldQueue
                 isFinal: fn (Response $response): bool => ! $this->willRetry($response),
             );
         } catch (ConnectionException $e) {
-            if ($this->withinBudget()) {
+            if ($this->idempotent() && $this->withinBudget()) {
                 $backoff = $this->backoff();
 
                 $this->release($backoff[$this->attempts() - 1] ?? (int) end($backoff));
@@ -150,13 +152,22 @@ class WeclappApiCallJob implements ShouldQueue
     }
 
     /**
-     * A 429 or 5xx is "not yet", not "failed", while the budget lasts.
+     * A 429, or a 5xx on an idempotent verb, is "not yet", not "failed", while
+     * the budget lasts.
      */
     private function willRetry(Response $response): bool
     {
         return ! $response->successful()
-            && ($response->status() === 429 || $response->status() >= 500)
+            && ($response->status() === 429 || ($response->status() >= 500 && $this->idempotent()))
             && $this->withinBudget();
+    }
+
+    /**
+     * Same rule as WeclappClient::shouldRetry().
+     */
+    private function idempotent(): bool
+    {
+        return in_array($this->method, ['PUT', 'DELETE'], true);
     }
 
     /**

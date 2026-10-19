@@ -285,9 +285,12 @@ dispatch($job); // or batch several with Bus::batch([...])
 ```
 
 A queued call is throttled by the `weclapp-api-jobs` rate limiter and keeps
-being retried — after a throttle, a `429`, a `5xx` or a connection error — for
-up to an hour from dispatch before it fails; a refusal (`4xx`) fails at once.
-A call whose batch was cancelled is skipped.
+being retried — after a throttle or a `429`, and for `PUT`/`DELETE` also after
+a `5xx` or a connection error — for up to an hour from dispatch before it
+fails. A `POST` that gets a `5xx` or no answer fails at once, as on the
+synchronous path: Weclapp may already have created the record, and sending it
+again could create a second one. A refusal (`4xx`) fails at once. A call whose
+batch was cancelled is skipped.
 
 Either path emits a `Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted`
 event on success and failure, so consumers can react without threading return

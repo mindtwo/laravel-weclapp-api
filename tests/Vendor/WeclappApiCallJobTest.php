@@ -93,12 +93,41 @@ describe('retries', function () {
         Event::fake([WeclappApiCallCompleted::class]);
         Http::fake(['*' => Http::response('', 503)]);
 
-        $job = (new WeclappApiCallJob('quotation', 'POST', ['foo' => 'bar']))->withFakeQueueInteractions();
+        $job = (new WeclappApiCallJob('article/id/9', 'PUT', ['name' => 'New']))->withFakeQueueInteractions();
         $job->handle();
 
         $job->assertReleased(30);
         // The transport sends once per attempt even on PUT; the queue is what retries.
         Http::assertSentCount(1);
+    });
+
+    it('fails a POST on a server error instead of sending it again', function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+        Http::fake(['*' => Http::response('', 503)]);
+
+        $job = (new WeclappApiCallJob('quotation', 'POST', ['foo' => 'bar']))->withFakeQueueInteractions();
+        $job->handle();
+
+        $job->assertNotReleased();
+        $job->assertFailedWith(WeclappApiCallFailedException::class);
+        Http::assertSentCount(1);
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 503 && $e->final === true);
+    });
+
+    it('fails a POST on a connection error, sending once', function () {
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            $calls++;
+
+            throw new ConnectionException('timed out');
+        });
+
+        $job = (new WeclappApiCallJob('quotation', 'POST', ['foo' => 'bar']))->withFakeQueueInteractions();
+        $job->handle();
+
+        $job->assertNotReleased();
+        $job->assertFailedWith(ConnectionException::class);
+        expect($calls)->toBe(1);
     });
 
     it('releases itself with its own backoff after a connection error, sending once', function () {
