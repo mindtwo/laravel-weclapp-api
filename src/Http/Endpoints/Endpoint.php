@@ -127,17 +127,24 @@ abstract class Endpoint
     }
 
     /**
-     * Replace a record by id.
+     * Update a record by id: a full replace, or with $partial only the given
+     * properties (send `version` too for optimistic locking).
      *
      * @param array<string, mixed> $data
      *
      * @throws BadMethodCallException when the resource is not updatable
      */
-    public function update(string|int $id, array $data): LazyResponseProxy
+    public function update(string|int $id, array $data, bool $partial = false): LazyResponseProxy
     {
         $this->guardWrite('update');
 
-        return new LazyResponseProxy($this->api, $this->api->recordPath($this->path, $id), Request::METHOD_PUT, body: $data);
+        return new LazyResponseProxy(
+            $this->api,
+            $this->api->recordPath($this->path, $id),
+            Request::METHOD_PUT,
+            body: $data,
+            queryParams: $partial ? ['ignoreMissingProperties' => 'true'] : [],
+        );
     }
 
     /**

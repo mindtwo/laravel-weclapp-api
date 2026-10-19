@@ -98,7 +98,8 @@ It is documented per property. Use it rather than defaulting every string to
 
 The JSON is a lossy conversion. **Read the YAML for behaviour** — filter
 operators (`-eq`, `-in`, dot-notation predicates), the `properties=`
-partial-response parameter, PATCH semantics — **and the JSON for structure**
+partial-response parameter, partial PUT via `ignoreMissingProperties` (there is
+no PATCH) — **and the JSON for structure**
 (it parses fast and the tests use it). `SpecFilesAgreeTest` guards the overlap.
 
 ## There are no example responses

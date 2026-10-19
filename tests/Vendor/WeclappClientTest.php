@@ -198,6 +198,18 @@ it('does not append the dryRun flag to a put by default', function () {
         && str_ends_with($request->url(), '/article/id/1964'));
 });
 
+it('sends a partial put with ignoreMissingProperties, alongside dryRun when both are asked for', function () {
+    Http::fake(['*' => Http::response(['id' => '5'], 200)]);
+
+    WeclappClient::put('article', 5, ['version' => '2', 'name' => 'x'], partial: true);
+    WeclappClient::put('article', 5, ['version' => '2', 'name' => 'x'], dryRun: true, partial: true);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/article/id/5?ignoreMissingProperties=true')
+        && ! str_contains($request->url(), 'dryRun'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'dryRun=true')
+        && str_contains($request->url(), 'ignoreMissingProperties=true'));
+});
+
 it('suppresses a dry-run put too, since it still leaves the environment', function () {
     config()->set('weclapp-api.writes_enabled', false);
     Http::fake();

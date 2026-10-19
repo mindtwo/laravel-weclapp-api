@@ -253,7 +253,8 @@ thing.
 `paths` (698), `components.schemas` (442) and `components.responses` (154). The
 JSON is a lossy conversion that drops `info.description` — **77k characters**
 documenting filter operators (`-eq`, `-in`, dot-notation predicates), the
-`properties=` partial-response parameter and PATCH semantics — plus all 207
+`properties=` partial-response parameter and partial PUT via
+`ignoreMissingProperties` (there is no PATCH) — plus all 207
 `tags` and 42 path descriptions. **Read the YAML for behaviour, the JSON for
 structure.** `SpecFilesAgreeTest` pins the parts that must stay in sync.
 

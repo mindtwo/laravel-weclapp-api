@@ -505,15 +505,19 @@ class WeclappClient
      * and a caller that needs to tell the difference must check
      * writesSuppressed() rather than read anything into the empty return.
      *
+     * Without $partial every property missing from $data is set to null; with
+     * it only the given properties change (send `version` too for optimistic
+     * locking).
+     *
      * @param array<string, mixed> $data
      *
      * @throws RequestException
      *
      * @return array<string, mixed>
      */
-    public function put(string $endpoint, string|int $id, array $data, bool $dryRun = false): array
+    public function put(string $endpoint, string|int $id, array $data, bool $dryRun = false, bool $partial = false): array
     {
-        $response = $this->send(Request::METHOD_PUT, $this->recordPath($endpoint, $id), $data, $this->dryRun($dryRun));
+        $response = $this->send(Request::METHOD_PUT, $this->recordPath($endpoint, $id), $data, $this->putQuery($dryRun, $partial));
 
         $response->throw();
 
@@ -583,9 +587,22 @@ class WeclappClient
      */
     private function dryRun(bool $dryRun): ?Closure
     {
-        return $dryRun
-            ? fn (PendingRequest $client): PendingRequest => $client->withQueryParameters(['dryRun' => 'true'])
-            : null;
+        return $this->putQuery($dryRun, false);
+    }
+
+    /**
+     * `dryRun` has Weclapp validate without persisting; `ignoreMissingProperties`
+     * turns the full-replace PUT into one that changes only the given fields.
+     *
+     * @return (Closure(PendingRequest): PendingRequest)|null
+     */
+    private function putQuery(bool $dryRun, bool $partial): ?Closure
+    {
+        $query = array_filter(['dryRun' => $dryRun, 'ignoreMissingProperties' => $partial]);
+
+        return $query === []
+            ? null
+            : fn (PendingRequest $client): PendingRequest => $client->withQueryParameters(array_map(fn (): string => 'true', $query));
     }
 
     /**

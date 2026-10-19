@@ -36,3 +36,19 @@ it('counts records for an endpoint', function () {
 
     expect(WeclappClient::parties()->count(['company-eq' => 'ACME']))->toBe(12);
 });
+
+it('sends ignoreMissingProperties on a partial update, and not otherwise', function () {
+    Http::fake(['*' => Http::response(['id' => '9'], 200)]);
+
+    WeclappClient::articles()->update(9, ['version' => '3', 'name' => 'x'], partial: true)->status();
+    WeclappClient::articles()->update(9, ['name' => 'x'])->status();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/article/id/9?ignoreMissingProperties=true'));
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/article/id/9'));
+});
+
+it('keeps the partial flag on the queued job', function () {
+    $job = WeclappClient::articles()->update(9, ['name' => 'x'], partial: true)->getJob();
+
+    expect($job->queryParams)->toBe(['ignoreMissingProperties' => 'true']);
+});

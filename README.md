@@ -189,13 +189,19 @@ that a field is unsupported — and why the trap below exists at all.
 `find()` accounts for this, `get()` unwraps the envelope.
 
 **PUT is a full replace, and omitting a field counts as changing it.** This turns a
-seemingly harmless partial update into a permission error:
+seemingly harmless partial update into a permission error. The spec's answer is
+`ignoreMissingProperties=true`, which `partial: true` sends; include `version` so
+Weclapp can refuse a stale write:
 
 ```php
 // 403 — the payload omits articleType, which reads as changing it
 WeclappClient::put('article', $id, ['shortDescription1' => 'x']);
 
-// The only shape that works: re-read, merge, send the whole record back
+// Changes only the given fields
+WeclappClient::put('article', $id, ['version' => $v, 'shortDescription1' => 'x'], partial: true);
+WeclappClient::articles()->update($id, ['version' => $v, 'shortDescription1' => 'x'], partial: true);
+
+// The full-replace form: re-read, merge, send the whole record back
 $record = (array) WeclappClient::find('article', $id);
 WeclappClient::put('article', $id, [...$record, 'shortDescription1' => 'x']);
 ```

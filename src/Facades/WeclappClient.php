@@ -168,7 +168,7 @@ use Mindtwo\LaravelWeclappApi\WeclappClient as BaseWeclappClient;
  * @method static int count(string $endpoint, array<string, mixed> $params = [])
  * @method static \Illuminate\Http\Client\Response|null download(string $path, array<string, mixed> $params = [])
  * @method static array<string, mixed> post(string $endpoint, array<string, mixed> $data, bool $dryRun = false)
- * @method static array<string, mixed> put(string $endpoint, string|int $id, array<string, mixed> $data, bool $dryRun = false)
+ * @method static array<string, mixed> put(string $endpoint, string|int $id, array<string, mixed> $data, bool $dryRun = false, bool $partial = false)
  * @method static array<string, mixed>|null upload(string $path, string $contents, string $filename, string $contentType = 'application/octet-stream', array<string, mixed> $params = [])
  * @method static bool delete(string $endpoint, string|int $id)
  * @method static string recordPath(string $endpoint, string|int $id)
