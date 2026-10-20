@@ -604,6 +604,21 @@ it('archives parties Weclapp no longer returns', function () {
         ->and(Party::withTrashed()->where('weclapp_id', 70001)->firstOrFail()->trashed())->toBeTrue();
 });
 
+it('archives nothing when a later page fails, since the read is then partial', function () {
+    config()->set('weclapp-api.page_size', 1);
+    config()->set('weclapp-api.http.retry_times', 1);
+    Party::factory()->create(['weclapp_id' => 70001]);
+    Http::fakeSequence()
+        ->push(['result' => [['id' => 12345, 'customer' => true]]], 200)
+        ->push(['error' => 'unavailable'], 503);
+
+    $this->artisan('weclapp:sync parties')->assertFailed();
+
+    // 70001 may well sit on the page that failed; archiving it would delete a
+    // live record.
+    expect(Party::query()->where('weclapp_id', 70001)->exists())->toBeTrue();
+});
+
 it('reports nothing archived when the mirror already matches', function () {
     Article::factory()->create(['weclapp_id' => 20001]);
 

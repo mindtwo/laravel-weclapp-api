@@ -32,14 +32,18 @@ final readonly class EntitySynchronizer
      */
     public function sync(SyncDefinition $definition, array $filters = []): array
     {
-        $records = $this->client->get($definition->endpoint, [...$definition->filters, ...$filters]);
+        // Lazily, a page at a time: a large resource (/party is ~9 000 records)
+        // held whole would not fit a default 128 MB CLI memory limit.
+        $records = $this->client->lazy($definition->endpoint, [...$definition->filters, ...$filters]);
 
         $seen = [];
+        $synced = 0;
 
         // Rows are saved one model at a time so Eloquent's dirty check decides
         // what is written and updated_at only moves on a real change; the lookup
         // is what is batched, one query per chunk instead of one per record.
         foreach ($records->chunk(self::CHUNK) as $chunk) {
+            $synced += $chunk->count();
             $attributes = [];
 
             foreach ($chunk as $record) {
@@ -72,7 +76,7 @@ final readonly class EntitySynchronizer
         }
 
         return [
-            'synced'   => $records->count(),
+            'synced'   => $synced,
             'archived' => $this->reconcile($definition, $seen, $filters),
         ];
     }
@@ -124,10 +128,11 @@ final readonly class EntitySynchronizer
      *    records: a response full of records without an id would otherwise
      *    compile to `NOT IN ()`, which matches every row.
      *
-     * A partial set is not a risk: WeclappClient::get() throws on a failed page
-     * rather than returning a short list, and it walks the collection by id
-     * cursor, so a record deleted or inserted mid-read cannot shift a later
-     * page and drop a live record out of the result.
+     * A partial set is not a risk: WeclappClient::lazy() throws on a failed page
+     * rather than ending the walk early, so a broken read never gets this far —
+     * the chunks saved before it stay saved, nothing is archived. It walks the
+     * collection by id cursor, so a record deleted or inserted mid-read cannot
+     * shift a later page and drop a live record out of the result.
      *
      * The keys are inlined rather than bound: a tenant with more records than
      * the driver's placeholder limit (65 535 on MySQL and PostgreSQL, 32 766 on
