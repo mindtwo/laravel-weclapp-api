@@ -164,6 +164,7 @@ use Mindtwo\LaravelWeclappApi\WeclappClient as BaseWeclappClient;
 
 /**
  * @method static \Illuminate\Support\Collection<int, object> get(string $endpoint, array<string, mixed> $params = [])
+ * @method static \Illuminate\Support\LazyCollection<int, object> lazy(string $endpoint, array<string, mixed> $params = [])
  * @method static object|null find(string $endpoint, string|int $id)
  * @method static int count(string $endpoint, array<string, mixed> $params = [])
  * @method static \Illuminate\Http\Client\Response|null download(string $path, array<string, mixed> $params = [])

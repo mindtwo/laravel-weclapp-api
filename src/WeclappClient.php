@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mindtwo\LaravelWeclappApi;
 
 use Closure;
+use Generator;
 use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
@@ -13,6 +14,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\LazyCollection;
 use InvalidArgumentException;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
 use Mindtwo\LaravelWeclappApi\Http\Endpoints\AccountingTransaction;
@@ -257,19 +259,9 @@ class WeclappClient
     /**
      * Fetch every record from a paginated collection endpoint, merging all pages.
      *
-     * Pages are walked by key, not by offset: sorted by id, each request asks
-     * for the ids above the last one seen. Weclapp documents no default order,
-     * so offset pages over a collection that changes mid-read shift under the
-     * client — a record deleted on an earlier page moves the first record of
-     * the next page out of reach, and the sync then archives it as gone. A key
-     * cursor cannot shift. The loop ends on an empty page rather than a short
-     * one, because a resource whose cap is lower than the configured page size
-     * answers every page short.
-     *
-     * A caller that orders the result itself, or filters on the id, gets plain
-     * offset pages: a second sort or id filter would contradict its own. A caller
-     * that passes `page` gets exactly that page (with its own `pageSize`), for
-     * collections too large to hold in memory at once.
+     * The whole collection is held in memory; lazy() walks the same pages one at
+     * a time. A caller that passes `page` gets exactly that page (with its own
+     * `pageSize`).
      *
      * @param array<string, mixed> $params
      *
@@ -291,10 +283,51 @@ class WeclappClient
             return collect(array_values(array_filter((array) ($response->object()->result ?? []), 'is_object')));
         }
 
+        return collect($this->lazy($endpoint, $params)->all());
+    }
+
+    /**
+     * Every record of a paginated collection endpoint, fetched a page at a time
+     * as the caller consumes them, so memory holds one page rather than the
+     * whole collection.
+     *
+     * Pages are walked by key, not by offset: sorted by id, each request asks
+     * for the ids above the last one seen. Weclapp documents no default order,
+     * so offset pages over a collection that changes mid-read shift under the
+     * client — a record deleted on an earlier page moves the first record of
+     * the next page out of reach, and the sync then archives it as gone. A key
+     * cursor cannot shift. The loop ends on an empty page rather than a short
+     * one, because a resource whose cap is lower than the configured page size
+     * answers every page short.
+     *
+     * A caller that orders the result itself, or filters on the id, gets plain
+     * offset pages: a second sort or id filter would contradict its own.
+     *
+     * A failed page throws when the walk reaches it, after the records before it
+     * have been handed out; a caller acting on the whole set (as reconciliation
+     * does) must only do so once the iteration has finished.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @throws RequestException
+     *
+     * @return LazyCollection<int, object>
+     */
+    public function lazy(string $endpoint, array $params = []): LazyCollection
+    {
+        return LazyCollection::make(fn (): Generator => $this->walk($endpoint, $params));
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return Generator<int, object>
+     */
+    private function walk(string $endpoint, array $params): Generator
+    {
         // Weclapp caps pageSize at 1000; anything below 1 would never end the loop.
         $pageSize = max(1, min(1000, (int) config('weclapp-api.page_size', 1000)));
         $keyset = ! isset($params['sort']) && ! $this->filtersOnId($params);
-        $results = [];
         $page = 1;
         $lastId = null;
 
@@ -338,7 +371,10 @@ class WeclappClient
                 break;
             }
 
-            array_push($results, ...$batch);
+            // Not `yield from`: that reuses each page's own keys, which restart at 0.
+            foreach ($batch as $record) {
+                yield $record;
+            }
 
             $page++;
 
@@ -351,8 +387,6 @@ class WeclappClient
 
             $lastId = $pageLastId ?? $lastId;
         } while ($batch !== [] && ($keyset || count($batch) >= $pageSize));
-
-        return collect($results);
     }
 
     /**

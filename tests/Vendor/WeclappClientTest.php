@@ -106,6 +106,28 @@ it('pages by offset when the caller filters on the id', function () {
     ]);
 });
 
+it('fetches the next page lazily, only once the records before it are consumed', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '1'], ['id' => '2']]], 200)
+        ->push(['result' => [['id' => '3']]], 200)
+        ->push(['result' => []], 200);
+
+    $records = WeclappClient::lazy('party');
+
+    Http::assertSentCount(0);
+
+    // Requests sent by the time each record arrives.
+    $sentAt = [];
+
+    foreach ($records as $record) {
+        $sentAt[$record->id] = count(Http::recorded());
+    }
+
+    expect($sentAt)->toBe([1 => 1, 2 => 1, 3 => 2]);
+
+    Http::assertSentCount(3);
+});
+
 it('stops after a page whose records carry no id rather than re-reading it forever', function () {
     Http::fake(['*' => Http::response(['result' => [['name' => 'no id']]], 200)]);
 
