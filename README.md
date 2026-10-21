@@ -452,7 +452,8 @@ scope a query to one role.
 > **`projects` is undocumented but real.** The `project` resource appears nowhere
 > in the official OpenAPI v2 spec, yet it responds and is populated
 > (live-confirmed). Because it is undocumented, Weclapp gives no compatibility
-> guarantee for it.
+> guarantee for it, and `WeclappClient::projects()` offers reads only — no write
+> has been verified against a tenant.
 
 ### What the sync layer covers, and what it leaves to you
 

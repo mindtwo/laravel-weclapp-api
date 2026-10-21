@@ -221,40 +221,6 @@ it('generates parseable php for every resource in the spec', function () {
     expect($parsed)->toBeGreaterThan(300);
 });
 
-it('generates syntactically valid php for every mirrored resource', function (string $resource) {
-    $command = app()->make(Mindtwo\LaravelWeclappApi\Commands\WeclappMakeMirrorCommand::class);
-    $blueprint = MirrorBlueprint::for($resource);
-
-    foreach (['migration', 'model', 'factory'] as $kind) {
-        $method = new ReflectionMethod($command, $kind);
-        $source = (string) $method->invoke($command, $blueprint);
-
-        $stub = (string) tempnam(sys_get_temp_dir(), 'mirror');
-        $file = $stub.'.php';
-        file_put_contents($file, $source);
-
-        // proc_open with an array command bypasses shell parsing on both
-        // platforms. Building a string for exec() means quoting it for cmd.exe,
-        // which mangles a line that both starts and ends with a quote -- and
-        // PHP_BINARY contains a space under Herd.
-        $process = proc_open(
-            [PHP_BINARY, '-l', $file],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes,
-        );
-
-        $output = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
-        array_map(fclose(...), $pipes);
-        $status = proc_close($process);
-
-        unlink($file);
-        unlink($stub);
-
-        expect($status)->toBe(0, "{$resource} {$kind}: ".trim($output));
-    }
-    // A php -l cross-check, kept in case php-parser is absent.
-})->with(['articlePrice', 'party']);
-
 it('registers the generator in a checkout, where the vendored spec is present', function () {
     // docs/ is export-ignored, so a composer install has no spec and the command
     // would fail on read -- and would write into vendor/ if it did not. It is
@@ -292,6 +258,13 @@ describe('writing', function () {
         $this->artisan('weclapp:make-mirror', ['resource' => 'articlePrice', '--dry' => true, '--force' => true])
             ->expectsOutputToContain('would overwrite database/migrations/2026_04_20_100010_create_weclapp_article_prices_table.php')
             ->expectsOutputToContain('would overwrite src/Models/ArticlePrice.php')
+            ->assertExitCode(0);
+    });
+
+    it('points to the existing registration instead of printing new entries for a shipped mirror', function () {
+        $this->artisan('weclapp:make-mirror', ['resource' => 'articlePrice', '--dry' => true, '--force' => true])
+            ->expectsOutputToContain('article-prices is already registered')
+            ->doesntExpectOutputToContain('Two edits are left to make by hand')
             ->assertExitCode(0);
     });
 

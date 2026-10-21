@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Mindtwo\LaravelWeclappApi\Spec\MirrorBlueprint;
 use Mindtwo\LaravelWeclappApi\Spec\SpecReader;
+use Mindtwo\LaravelWeclappApi\Sync\SyncRegistry;
 
 class WeclappMakeMirrorCommand extends Command
 {
@@ -126,6 +127,18 @@ class WeclappMakeMirrorCommand extends Command
     private function reportManualSteps(MirrorBlueprint $blueprint, string $migrationPath): void
     {
         $model = $blueprint->modelClass();
+        $slug = Str::kebab(Str::pluralStudly($model));
+
+        // A regenerated shipped mirror is registered already: pasting the
+        // entries again would duplicate a MIGRATIONS key, where the last one
+        // silently wins, and replace a hand-tuned SyncRegistry definition.
+        if (array_key_exists($slug, SyncRegistry::all())) {
+            $this->newLine();
+            $this->line("<comment>{$slug} is already registered in Sync\\SyncRegistry and WeclappApiServiceProvider::MIGRATIONS;</comment>");
+            $this->line('<comment>compare the generated files with those entries instead of adding new ones.</comment>');
+
+            return;
+        }
 
         $this->newLine();
         $this->line('<comment>Two edits are left to make by hand:</comment>');
@@ -138,7 +151,7 @@ class WeclappMakeMirrorCommand extends Command
         $this->newLine();
         $this->raw(sprintf(
             "        '%s' => '%s',",
-            Str::kebab(Str::pluralStudly($model)),
+            $slug,
             basename($migrationPath),
         ));
         $this->newLine();

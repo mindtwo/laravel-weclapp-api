@@ -65,6 +65,12 @@ function endpointPath(Endpoint $endpoint): string
     return (string) (new ReflectionProperty($endpoint, 'path'))->getValue($endpoint);
 }
 
+it('still finds every undocumented exemption missing from the spec', function () {
+    // Once a re-vendored spec documents one of them, its class must be checked
+    // like every other; drop it from UNDOCUMENTED then.
+    expect(array_intersect(UNDOCUMENTED, SpecReader::resources()))->toBe([]);
+});
+
 it('has a class for every documented CRUD resource', function () {
     $covered = array_values(array_map(endpointPath(...), endpoints()));
 

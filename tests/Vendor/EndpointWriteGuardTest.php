@@ -38,6 +38,10 @@ it('refuses a write the resource does not offer', function (string $accessor, st
     // purchaseRequisition only supports PUT
     'requisition create' => ['purchaseRequisitions', 'create'],
     'requisition delete' => ['purchaseRequisitions', 'delete'],
+    // project is undocumented; no write has been verified against a tenant
+    'project create' => ['projects', 'create'],
+    'project update' => ['projects', 'update'],
+    'project delete' => ['projects', 'delete'],
 ]);
 
 it('names the resource and the supported writes in the error', function () {

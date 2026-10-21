@@ -402,8 +402,11 @@ php artisan weclapp:make-mirror contract --dry           # list what would be wr
 php artisan weclapp:make-mirror ticket --only=id,subject,ticketNumber
 ```
 
-The command is only registered when `docs/specifications` is present, i.e. in
-a git checkout; a Composer install has no spec and no generator. It refuses to
+The command is only registered in the package's own checkout: the spec under
+`docs/specifications` must be present and the package must not sit under
+`vendor/`. A Composer install has neither spec nor generator, and a source
+install (`--prefer-source`), which does bring `docs/` along, still gets no
+generator. It refuses to
 touch a file that already exists unless `--force` is given, and checks all
 three targets before writing any of them.
 

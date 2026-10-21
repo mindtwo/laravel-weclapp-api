@@ -49,26 +49,10 @@ Both produced a green test suite and fixtures no real response could contain.
 `$ref`s. Resolved, it has 16 properties.
 
 ```php
-$schemas = json_decode(file_get_contents(
-    __DIR__.'/../docs/specifications/weclapp-openapi_v2.json'
-), true)['components']['schemas'];
+use Mindtwo\LaravelWeclappApi\Spec\SpecReader;
 
-$resolve = function (string $name, array $seen = []) use (&$resolve, $schemas): array {
-    if (isset($seen[$name])) {
-        return [];
-    }
-
-    $seen[$name] = true;
-    $out = [];
-
-    foreach ($schemas[$name]['allOf'] ?? [] as $sub) {
-        $out += isset($sub['$ref'])
-            ? $resolve(basename($sub['$ref']), $seen)
-            : ($sub['properties'] ?? []);
-    }
-
-    return $out + ($schemas[$name]['properties'] ?? []);
-};
+// The resource's own schema (via the GET-by-id response), allOf resolved.
+$properties = SpecReader::properties(SpecReader::schemaFor('articlePrice'));
 ```
 
 **Never conclude "the spec has no schemas" from an unresolved read.** That
@@ -118,8 +102,10 @@ from JSON entirely** — an absent key looks exactly like a nonexistent field. A
 three-record `articlePrice` sample shows 12 fields; all 967 show 16, and the
 missing four include `customerId`.
 
-So: shape from the spec, distribution from a full read. If you sample, pull the
-whole collection or do not draw conclusions from it.
+So: shape from the spec, distribution from a full read. Send
+`serializeNulls=true` (documented on every collection read, not on `/id/{id}`)
+so empty fields come back as `null` instead of missing; without it, pull the
+whole collection or do not draw conclusions from a sample.
 
 Practical notes for probing: base URL `https://<tenant>.weclapp.com/webapp/api/v2/` (the value of `MINDTWO_WECLAPP_URL`),
 header `AuthenticationToken` (raw, no `Bearer`), responses are **gzipped** so
