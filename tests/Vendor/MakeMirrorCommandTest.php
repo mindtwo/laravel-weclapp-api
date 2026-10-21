@@ -269,13 +269,22 @@ it('reads the vendored spec from docs/specifications', function () {
 describe('writing', function () {
     it('refuses before writing anything when a target exists', function () {
         $before = glob(__DIR__.'/../../database/migrations/*.php');
+        // The existing migration is reused, so a write before the check would
+        // change it in place rather than add a file; compare contents too.
+        $targets = array_map(fn (string $path) => __DIR__.'/../../'.$path, [
+            'database/migrations/2026_04_20_100010_create_weclapp_article_prices_table.php',
+            'src/Models/ArticlePrice.php',
+            'database/factories/ArticlePriceFactory.php',
+        ]);
+        $hashes = array_map('md5_file', $targets);
 
         $this->artisan('weclapp:make-mirror', ['resource' => 'articlePrice'])
             ->expectsOutputToContain('src/Models/ArticlePrice.php already exists; pass --force to overwrite.')
             ->assertExitCode(1);
 
         // The migration used to be written first and left behind as an orphan.
-        expect(glob(__DIR__.'/../../database/migrations/*.php'))->toBe($before);
+        expect(glob(__DIR__.'/../../database/migrations/*.php'))->toBe($before)
+            ->and(array_map('md5_file', $targets))->toBe($hashes);
     });
 
     it('regenerates an existing mirror into its own migration rather than a second one', function () {
