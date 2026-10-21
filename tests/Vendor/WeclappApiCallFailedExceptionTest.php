@@ -24,7 +24,14 @@ it('reads the RFC 7807 detail, preferring it over the deprecated fields', functi
         ->and($e->validationErrors)->toBe([]);
 });
 
-it('falls back to title, then to the deprecated fields', function () {
+it('prefers the specific legacy message over the generic title when detail is missing', function () {
+    $body = ['title' => 'validation failed', 'messages' => [['message' => 'customerId must not be null']], 'error' => 'customerId must not be null'];
+
+    expect(WeclappApiCallFailedException::fromResponse('quotation', 'POST', failedResponse(400, $body))->getMessage())
+        ->toEndWith(': customerId must not be null');
+});
+
+it('falls back to each field on its own', function () {
     expect(WeclappApiCallFailedException::fromResponse('quotation', 'POST', failedResponse(400, ['title' => 'Bad Request']))->getMessage())
         ->toEndWith(': Bad Request')
         ->and(WeclappApiCallFailedException::fromResponse('quotation', 'POST', failedResponse(400, ['messages' => [['message' => 'old style']]]))->getMessage())

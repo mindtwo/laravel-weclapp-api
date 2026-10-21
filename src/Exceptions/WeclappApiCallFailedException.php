@@ -24,16 +24,18 @@ class WeclappApiCallFailedException extends RuntimeException
     }
 
     /**
-     * Weclapp answers with an RFC 7807 problem: `detail`/`title` describe it and
-     * `validationErrors[]` says which field. The flat `error` and `messages[]`
-     * are deprecated and only read when the others are absent.
+     * Weclapp answers with an RFC 7807 problem: `detail` describes this case and
+     * `validationErrors[]` says which field. `detail` is often missing, above all
+     * on validation errors, so the deprecated `messages[]` and `error`, which are
+     * still sent, come next; `title` only names the problem type ("validation
+     * failed") and is always present, so it comes last.
      */
     public static function fromResponse(string $endpoint, string $method, Response $response): self
     {
         $body = $response->json();
         $body = is_array($body) ? $body : [];
 
-        $detail = $body['detail'] ?? $body['title'] ?? $body['messages'][0]['message'] ?? $body['error'] ?? null;
+        $detail = $body['detail'] ?? $body['messages'][0]['message'] ?? $body['error'] ?? $body['title'] ?? null;
         $detail = is_string($detail) && $detail !== '' ? $detail : null;
 
         $validationErrors = array_values(array_filter(
