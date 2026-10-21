@@ -7,6 +7,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
+use Mindtwo\LaravelWeclappApi\Exceptions\WeclappApiCallFailedException;
 use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
 use Mindtwo\LaravelWeclappApi\Jobs\WeclappApiCallJob;
 
@@ -143,6 +144,30 @@ describe('a proxy nobody reads', function () {
         Http::fake(fn () => throw new ConnectionException('timed out'));
         $handler = Mockery::mock(ExceptionHandler::class);
         $handler->shouldReceive('report')->once()->with(Mockery::type(ConnectionException::class));
+        app()->instance(ExceptionHandler::class, $handler);
+
+        (function (): void {
+            WeclappClient::tickets()->delete(9);
+        })();
+    });
+
+    it('reports a refusal of the late send, since nobody reads its status', function () {
+        Http::fake(['*/ticket/id/9' => Http::response(['detail' => 'not allowed'], 403)]);
+        $handler = Mockery::mock(ExceptionHandler::class);
+        $handler->shouldReceive('report')->once()->with(Mockery::on(fn (Throwable $e) => $e instanceof WeclappApiCallFailedException
+            && $e->statusCode === 403
+            && str_contains($e->getMessage(), 'not allowed')));
+        app()->instance(ExceptionHandler::class, $handler);
+
+        (function (): void {
+            WeclappClient::tickets()->delete(9);
+        })();
+    });
+
+    it('reports nothing when the late send succeeds', function () {
+        Http::fake(['*/ticket/id/9' => Http::response('', 204)]);
+        $handler = Mockery::mock(ExceptionHandler::class);
+        $handler->shouldNotReceive('report');
         app()->instance(ExceptionHandler::class, $handler);
 
         (function (): void {

@@ -9,6 +9,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
+use Mindtwo\LaravelWeclappApi\Exceptions\WeclappApiCallFailedException;
 use Mindtwo\LaravelWeclappApi\Jobs\WeclappApiCallJob;
 use Mindtwo\LaravelWeclappApi\WeclappClient;
 use RuntimeException;
@@ -156,7 +157,8 @@ class LazyResponseProxy implements ArrayAccess
 
     /**
      * A failure here has no caller left to catch it, and throwing from a
-     * destructor during shutdown is fatal, so it is reported instead.
+     * destructor during shutdown is fatal, so it is reported instead — a
+     * refusal too, since nobody reads the status of a response sent this late.
      */
     public function __destruct()
     {
@@ -165,7 +167,11 @@ class LazyResponseProxy implements ArrayAccess
         }
 
         try {
-            $this->execute();
+            $response = $this->execute();
+
+            if ($response->failed()) {
+                report(WeclappApiCallFailedException::fromResponse($this->endpoint, $this->method, $response));
+            }
         } catch (Throwable $e) {
             report($e);
         }

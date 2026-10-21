@@ -278,8 +278,14 @@ $id = $response->json()['id']; // executes here
 WeclappClient::tickets()->delete(9); // executes at the end of the statement
 ```
 
-A request sent that late has no caller left to throw to, so a failure is
-passed to the application's exception handler (`report()`) instead.
+A request sent that late has no caller left to throw to, so a failure — a
+connection error or a refusal such as a `403` or `422` — is passed to the
+application's exception handler (`report()`) instead.
+
+The proxy is sent whenever it goes out of scope unread, also when that scope
+ends because an exception was thrown after the proxy was created. Read the
+response, or call `getJob()`, before running code that may fail and should
+cancel the write.
 
 Or hand back an undispatched, rate-limited job instead of executing inline:
 
