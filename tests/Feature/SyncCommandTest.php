@@ -157,6 +157,35 @@ it('looks existing rows up per chunk rather than per record', function () {
         ->and($lookups)->toBe(3);
 });
 
+it('writes each page before asking for the next, holding one page at a time', function () {
+    config()->set('weclapp-api.page_size', 1000);
+    $firstPage = array_map(fn (int $id) => ['id' => $id, 'articleNumber' => "A-{$id}"], range(1, 1000));
+    $rowsWhenPageTwoWasAsked = null;
+
+    Http::fake(function ($request) use ($firstPage, &$rowsWhenPageTwoWasAsked) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+        if (! isset($query['id-gt'])) {
+            return Http::response(['result' => $firstPage], 200);
+        }
+
+        if ($query['id-gt'] === '1000') {
+            $rowsWhenPageTwoWasAsked = Article::query()->count();
+
+            return Http::response(['result' => [['id' => 1001, 'articleNumber' => 'A-1001']]], 200);
+        }
+
+        return Http::response(['result' => []], 200);
+    });
+
+    $this->artisan('weclapp:sync articles')
+        ->expectsOutputToContain('Synced 1001 articles.')
+        ->assertSuccessful();
+
+    expect($rowsWhenPageTwoWasAsked)->toBe(1000)
+        ->and(Article::query()->count())->toBe(1001);
+});
+
 it('never archives when no record carried an id, which would otherwise match every row', function () {
     Article::factory()->create(['weclapp_id' => 20001]);
     Http::fake(['*article*' => Http::response(['result' => [['articleNumber' => 'NO-ID']]], 200)]);

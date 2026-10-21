@@ -128,8 +128,12 @@ Each entity accessor returns an endpoint object. Reads execute immediately:
 // Collections are fully paginated and merged into one Collection
 $parties = WeclappClient::parties()->query(['company-eq' => 'ACME GmbH']);
 
-// …or one page at a time, for collections too large to hold at once
+// …or a single page, sorted by id unless you sort it yourself
 $movements = WeclappClient::warehouseStockMovements()->query(['page' => 3, 'pageSize' => 500]);
+
+// A collection too large to hold at once: walk it page by page by id cursor,
+// holding one page in memory (the mirror sync reads this way)
+WeclappClient::lazy('warehouseStockMovement')->each(fn (object $movement) => /* … */);
 
 // A single record, or null on 404
 $article = WeclappClient::articles()->find(20001);

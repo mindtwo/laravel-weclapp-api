@@ -67,6 +67,28 @@ it('walks a collection by id cursor until an empty page comes back', function ()
     ]);
 });
 
+describe('lazy()', function () {
+    it('keeps every record when collected, numbering them across pages', function () {
+        Http::fakeSequence()
+            ->push(['result' => [['id' => '1'], ['id' => '2']]], 200)
+            ->push(['result' => [['id' => '3']]], 200)
+            ->push(['result' => []], 200);
+
+        expect(array_keys(WeclappClient::lazy('party')->all()))->toBe([0, 1, 2]);
+    });
+
+    it('refuses page and offset, which address a single page', function (array $params) {
+        Http::fake();
+
+        expect(fn () => WeclappClient::lazy('party', $params))->toThrow(InvalidArgumentException::class);
+
+        Http::assertNothingSent();
+    })->with([
+        'page'   => [['page' => 2]],
+        'offset' => [['offset' => 10]],
+    ]);
+});
+
 it('keeps reading past a short page, since a resource may cap the page size below the configured one', function () {
     // page_size is 2 here; a cap of 1 would make every page short.
     Http::fakeSequence()

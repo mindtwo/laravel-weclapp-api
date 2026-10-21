@@ -318,7 +318,7 @@ class WeclappClient
      *
      * @param array<string, mixed> $params
      *
-     * @throws InvalidArgumentException for an `offset`, which addresses a single page
+     * @throws InvalidArgumentException for `page` or `offset`, which address a single page
      *
      * @return LazyCollection<int, object> iterating it throws RequestException on a failed
      *                                     page, and UnexpectedValueException when Weclapp ignores
@@ -326,9 +326,10 @@ class WeclappClient
      */
     public function lazy(string $endpoint, array $params = []): LazyCollection
     {
-        // Sent with every page, an offset would skip records on each of them.
-        if (isset($params['offset'])) {
-            throw new InvalidArgumentException('`offset` only applies to a single page; pass `page` to get() instead.');
+        // A walk covers the whole collection: `page` would be overwritten by the
+        // cursor, and an offset sent with every page would skip records on each.
+        if (isset($params['page']) || isset($params['offset'])) {
+            throw new InvalidArgumentException('`page` and `offset` address a single page; pass `page` to get() instead.');
         }
 
         // Both loops need the id to move on, so a partial response always carries it.
