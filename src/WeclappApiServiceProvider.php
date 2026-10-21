@@ -179,8 +179,7 @@ class WeclappApiServiceProvider extends PackageServiceProvider
      * its own `weclapp-api-migrations-{key}` tag so a consumer can take only the
      * tables it reads instead of all of them.
      *
-     * Keys match the Sync\SyncRegistry entity names, except `parties`, which
-     * backs both the `customers` and `suppliers` entities.
+     * Keys match the Sync\SyncRegistry entity names.
      *
      * @var array<string, string>
      */

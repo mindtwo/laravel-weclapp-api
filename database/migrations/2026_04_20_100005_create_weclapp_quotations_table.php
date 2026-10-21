@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('weclapp_quotations', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('customer_id')->nullable();
+            $table->unsignedBigInteger('customer_id')->nullable()->index();
             $table->unsignedBigInteger('status_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->unique();
             // Amounts take the spec's decimal shape: up to 13 integer and 5

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mindtwo\LaravelWeclappApi\Commands;
 
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Mindtwo\LaravelWeclappApi\Commands\Concerns\RunsSyncDefinitions;
@@ -25,7 +26,22 @@ class WeclappUpdateCommand extends Command
 
     public function handle(): int
     {
-        $sinceMs = $this->since()->getTimestampMs();
+        $option = $this->option('since');
+        $since = Carbon::now()->subDay();
+
+        if (is_string($option) && $option !== '') {
+            $parsed = $this->parseSince($option);
+
+            if ($parsed === null) {
+                $this->error(sprintf('Invalid --since value "%s"; pass a date or time such as "2026-10-01" or "-2 hours".', $option));
+
+                return self::FAILURE;
+            }
+
+            $since = $parsed;
+        }
+
+        $sinceMs = $since->getTimestampMs();
 
         return $this->runSyncDefinitions(function (SyncDefinition $definition, string $slug) use ($sinceMs): void {
             // The delta is a server-side filter on lastModifiedDate, which every
@@ -45,12 +61,16 @@ class WeclappUpdateCommand extends Command
         });
     }
 
-    protected function since(): Carbon
+    /**
+     * Null when the value cannot be read as a date — a typo in a scheduler entry
+     * should fail with a message, not a stack trace.
+     */
+    private function parseSince(string $value): ?Carbon
     {
-        $since = $this->option('since');
-
-        return is_string($since) && $since !== ''
-            ? Carbon::parse($since)
-            : Carbon::now()->subDay();
+        try {
+            return Carbon::parse($value);
+        } catch (InvalidFormatException) {
+            return null;
+        }
     }
 }

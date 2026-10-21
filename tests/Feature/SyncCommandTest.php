@@ -112,6 +112,16 @@ it('sends the delta filter when updating parties', function () {
     Http::assertSent(fn ($request) => str_contains($request->url(), 'lastModifiedDate-gt='));
 });
 
+it('fails with a message, not a stack trace, on a --since it cannot read', function () {
+    Http::fake();
+
+    $this->artisan('weclapp:update parties --since=gesten')
+        ->expectsOutputToContain('Invalid --since value "gesten"')
+        ->assertFailed();
+
+    Http::assertNothingSent();
+});
+
 it('is idempotent, upserting on weclapp_id', function () {
     Http::fake(['*article*' => Http::response(['result' => [[
         'id'            => 20001,

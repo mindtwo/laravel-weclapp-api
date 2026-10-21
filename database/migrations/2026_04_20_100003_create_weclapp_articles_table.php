@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('weclapp_articles', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('article_category_id')->nullable();
+            $table->unsignedBigInteger('article_category_id')->nullable()->index();
             // Flattened from the nested articleImages collection: the entry flagged
             // mainImage. Present so a consumer can ask whether Weclapp holds an image
             // for many articles at once without an API call per article.
@@ -48,7 +48,7 @@ return new class extends Migration
             // article belongs in the consuming application. An article can be active
             // and not visible, or visible and inactive; the two never imply each other.
             //
-            // Defaults to false so a mirror predating this column reads as "not
+            // Defaults to false so a row the sync has not written reads as "not
             // tagged" rather than as "everything belongs here", which is the
             // conservative direction — a consumer offering too few articles is a
             // visible gap, one offering too many is a silent leak.

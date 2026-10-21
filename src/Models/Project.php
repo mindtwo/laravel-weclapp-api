@@ -6,6 +6,7 @@ namespace Mindtwo\LaravelWeclappApi\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Mindtwo\LaravelWeclappApi\Database\Factories\ProjectFactory;
 
@@ -45,6 +46,14 @@ class Project extends Model
     protected static function newFactory(): ProjectFactory
     {
         return ProjectFactory::new();
+    }
+
+    /**
+     * @return BelongsTo<Party, $this>
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'customer_id', 'weclapp_id');
     }
 
     /**

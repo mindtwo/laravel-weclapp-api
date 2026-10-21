@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('weclapp_sales_orders', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('customer_id')->nullable();
-            $table->unsignedBigInteger('quotation_id')->nullable();
+            $table->unsignedBigInteger('customer_id')->nullable()->index();
+            $table->unsignedBigInteger('quotation_id')->nullable()->index();
             $table->unsignedBigInteger('responsible_user_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->unique();
             // Amounts take the spec's decimal shape: up to 13 integer and 5

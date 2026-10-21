@@ -71,6 +71,14 @@ class SalesOrder extends Model
     }
 
     /**
+     * @return BelongsTo<Party, $this>
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'customer_id', 'weclapp_id');
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
