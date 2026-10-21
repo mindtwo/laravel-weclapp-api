@@ -29,7 +29,8 @@ jobs:
         php: [8.5]
         laravel: [12.*, 13.*]
         stability: [prefer-lowest, prefer-stable]
-        # The declared floors, so prefer-lowest tests what composer.json allows.
+        # The testbench floors. prefer-lowest resolves the framework to the
+        # lowest version these require, not to composer.json's ^12.0 / ^13.0.
         include:
           - laravel: 13.*
             testbench: ^11.1

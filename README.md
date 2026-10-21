@@ -109,6 +109,11 @@ MINDTWO_WECLAPP_LOG_INCLUDE_PAYLOAD=false
 The values shown are the defaults (for the writes switch, blank is the default).
 Omit a line or leave it blank (`KEY=`) to keep its default.
 
+Leave `MINDTWO_WECLAPP_TIMEZONE` unset or equal to `APP_TIMEZONE`. Mirrored dates
+are built in this timezone, but Eloquent stores them as plain wall-clock values
+and reads them back in `APP_TIMEZONE`, so any other value shifts every mirrored
+date by the difference.
+
 `MINDTWO_WECLAPP_VISIBLE_TAG` is evaluated when an article row is written, so
 after changing it run a full `weclapp:sync articles` — `weclapp:update` only
 revisits articles Weclapp reports as modified and would leave the rest with
@@ -463,8 +468,9 @@ single value from inside nested data through a `derive` closure. The shipped
 definitions derive:
 
 - `articles`: `main_image_id` / `main_image_filename` (the flagged entry of
-  `articleImages`), `supply_source_count` (the size of `supplySources`), and
-  `visible` (whether `tags` holds `MINDTWO_WECLAPP_VISIBLE_TAG`);
+  `articleImages`), `supply_source_count` (the size of `supplySources`),
+  `active` (Weclapp's flag, `true` when absent), and `visible` (whether `tags`
+  holds `MINDTWO_WECLAPP_VISIBLE_TAG`);
 - `article-prices`: `reduction_type` / `reduction_value` (the first entry of
   `reductionAdditions`; a second one is logged, not mirrored);
 - `parties`: `is_customer` / `is_supplier` (Weclapp's role flags).

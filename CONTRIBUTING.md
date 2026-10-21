@@ -84,7 +84,7 @@ Help improve test coverage by:
 
 - PHP 8.5 or higher
 - Composer 2
-- Node.js 24 (`lts/krypton`, see `.nvmrc`; requires `>=24.18.0`) and npm 12 (pinned to `12.0.2` via the `packageManager` field, requires `>=12.0.0`) — used for commit tooling and releases
+- Node.js 24 (`lts/krypton`, see `.nvmrc`; requires `>=24.18.0`) and npm 12 (pinned to `12.0.2` via the `packageManager` field, requires `>=12.0.0`) — used for commit tooling and releases. Node 24 ships npm 11, so install npm 12 once with `npm install -g npm@12`
 - Git
 
 ### Initial Setup
@@ -352,11 +352,17 @@ That comparison is the only way to shrink the spec-only set.
 
 The inherited methods return:
 
-- `query(array $filters = []): Illuminate\Support\Collection` — all pages merged
+- `query(array $filters = []): Illuminate\Support\Collection` — all pages merged,
+  or just one page when `$filters` holds `page` (sorted by id unless it sorts)
 - `find(string|int $id): ?object` — `null` on 404
 - `count(array $filters = []): int`
-- `create(array)`, `update(string|int $id, array)`, `delete(string|int $id)` — a
-  `LazyResponseProxy`
+- `create(array)`, `update(string|int $id, array, bool $partial = false)`,
+  `delete(string|int $id)` — a `LazyResponseProxy`; `$partial` sends
+  `ignoreMissingProperties=true`
+- `writes(): array` — the write operations the resource offers
+
+To walk a collection too large to hold, use the client's
+`WeclappClient::lazy($path, $filters)`, which fetches one page at a time.
 
 The generic client (`WeclappClient::get()/find()/count()/post()`) already reaches
 any Weclapp resource, so a typed class is only about ergonomics and discoverability.
@@ -543,8 +549,11 @@ ticket(s):
   into the published `CHANGELOG.md`. External contributors should reference
   GitHub issues instead (`Fixes #123`).
 
-commitlint validates the subject on commit (`.husky/commit-msg`): conventional
-format, at most 100 characters. GrumPHP runs the linter, not the message check.
+Both hooks live in `.husky/` and are installed by `npm ci` (its `prepare`
+script runs husky). `.husky/pre-commit` runs GrumPHP, which lints the staged
+PHP files with Pint; `.husky/commit-msg` runs commitlint, which checks the
+subject: conventional format, at most 100 characters. After a fresh clone, run
+`npm ci` before the first commit, or neither hook runs.
 
 ### Pull Request Process
 
@@ -562,7 +571,6 @@ format, at most 100 characters. GrumPHP runs the linter, not the message check.
 3. **Update documentation** if needed:
     - Update README.md with new features
     - Add PHPDoc comments
-    - Update CHANGELOG.md
 
 4. **Create a Pull Request** with:
     - Clear title describing the change
@@ -584,7 +592,6 @@ Before submitting, ensure:
 - [ ] Static analysis passes (`composer analyse`)
 - [ ] New features have tests
 - [ ] Documentation is updated
-- [ ] CHANGELOG.md is updated (if applicable)
 - [ ] Commit messages are clear
 - [ ] No merge conflicts with main branch
 
