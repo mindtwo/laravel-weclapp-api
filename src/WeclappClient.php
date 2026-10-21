@@ -227,6 +227,10 @@ class WeclappClient
      * rejected the request before doing anything, so any verb may retry. Every
      * other 4xx is a refusal that a retry cannot change, and find()/download()
      * rely on a single 404 to mean "no such record".
+     *
+     * A PUT or DELETE whose first attempt went through but whose answer was
+     * lost can be refused on the retry (a version conflict, a 404) although the
+     * change was saved; the README tells callers to re-read before giving up.
      */
     protected function shouldRetry(Throwable $e, ?string $method): bool
     {
@@ -242,19 +246,27 @@ class WeclappClient
     }
 
     /**
-     * Milliseconds to wait before the next attempt: a numeric Retry-After from
-     * Weclapp wins (capped, since it can queue requests for up to 30 s), else
-     * the configured sleep grows linearly with the attempt.
+     * Milliseconds to wait before the next attempt.
+     *
+     * A 429 arrives only after Weclapp has queued the request for up to 30 s,
+     * and the spec asks for exponential backoff, so the wait doubles from twice
+     * the configured sleep; a numeric Retry-After, should Weclapp send one, wins.
+     * Both are capped at 30 s. Any other retry waits the configured sleep times
+     * the attempt.
      */
     protected function retryDelay(int $attempt, Throwable $e): int
     {
-        $retryAfter = $e instanceof RequestException ? $e->response->header('Retry-After') : null;
+        $sleep = (int) config('weclapp-api.http.retry_sleep', 500);
 
-        if (is_numeric($retryAfter)) {
-            return min(30, max(1, (int) $retryAfter)) * 1000;
+        if (! $e instanceof RequestException || $e->response->status() !== 429) {
+            return $attempt * $sleep;
         }
 
-        return $attempt * (int) config('weclapp-api.http.retry_sleep', 500);
+        $retryAfter = $e->response->header('Retry-After');
+
+        return is_numeric($retryAfter)
+            ? min(30, max(1, (int) $retryAfter)) * 1000
+            : min(30_000, $sleep * 2 ** $attempt);
     }
 
     /**
@@ -563,7 +575,7 @@ class WeclappClient
         return $response;
     }
 
-    public function isMutating(string $method): bool
+    private function isMutating(string $method): bool
     {
         return in_array($method, [Request::METHOD_POST, Request::METHOD_PUT, Request::METHOD_DELETE], true);
     }
@@ -715,7 +727,7 @@ class WeclappClient
      * Log a suppressed write and emit a completion event marked suppressed, so
      * consumers observe the intent without any outbound traffic.
      */
-    public function recordSuppressedWrite(string $method, string $endpoint): void
+    private function recordSuppressedWrite(string $method, string $endpoint): void
     {
         $channel = config('weclapp-api.logging.channel');
 

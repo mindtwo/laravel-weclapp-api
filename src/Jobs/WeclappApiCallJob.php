@@ -77,6 +77,10 @@ class WeclappApiCallJob implements ShouldQueue
             ? null
             : fn (PendingRequest $client): PendingRequest => $client->withQueryParameters($this->queryParams);
 
+        // Decided once, as the response arrives: the event's `final` and the
+        // release below must agree even if the budget runs out in between.
+        $retry = false;
+
         try {
             // One request per attempt; retrying is done through release().
             $response = $api->send(
@@ -85,7 +89,11 @@ class WeclappApiCallJob implements ShouldQueue
                 $this->body,
                 $configure,
                 retry: false,
-                isFinal: fn (Response $response): bool => ! $this->willRetry($response),
+                isFinal: function (Response $response) use (&$retry): bool {
+                    $retry = $this->willRetry($response);
+
+                    return ! $retry;
+                },
             );
         } catch (ConnectionException $e) {
             if ($this->idempotent() && $this->withinBudget()) {
@@ -105,7 +113,7 @@ class WeclappApiCallJob implements ShouldQueue
             return;
         }
 
-        if ($this->willRetry($response)) {
+        if ($retry) {
             $this->release($this->retryAfterSeconds($response));
 
             return;

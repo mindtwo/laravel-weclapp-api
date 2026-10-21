@@ -155,7 +155,7 @@ it('annotates every public client method on the facade with its real parameters'
     $facade = (string) file_get_contents(__DIR__.'/../../src/Facades/WeclappClient.php');
 
     // Plumbing the proxy and the job use; not for consumers, so not on the facade.
-    $internal = ['send', 'isMutating', 'recordSuppressedWrite'];
+    $internal = ['send'];
 
     $problems = [];
 

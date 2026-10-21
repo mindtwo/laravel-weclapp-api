@@ -451,6 +451,29 @@ describe('retry policy', function () {
         Sleep::assertSlept(fn (CarbonInterval $duration) => $duration->totalMilliseconds === 2000.0);
     });
 
+    it('backs off exponentially on a 429 without Retry-After, and linearly otherwise', function () {
+        config()->set('weclapp-api.http.retry_sleep', 500);
+        Sleep::fake();
+        Http::fakeSequence()
+            ->push('', 429)
+            ->push('', 429)
+            ->push(['id' => '5'], 200)
+            ->push('', 503)
+            ->push('', 503)
+            ->push(['id' => '5'], 200);
+
+        WeclappClient::put('article', 5, ['name' => 'x']);
+        WeclappClient::put('article', 5, ['name' => 'x']);
+
+        // 429: 1 s, 2 s; 5xx: 0.5 s, 1 s.
+        Sleep::assertSequence([
+            Sleep::for(1000)->milliseconds(),
+            Sleep::for(2000)->milliseconds(),
+            Sleep::for(500)->milliseconds(),
+            Sleep::for(1000)->milliseconds(),
+        ]);
+    });
+
     it('retries an idempotent put on a server error', function () {
         Http::fakeSequence()
             ->push('', 500)

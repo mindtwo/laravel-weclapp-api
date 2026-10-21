@@ -99,15 +99,17 @@ return [
     |
     | Hard limits and retry policy applied to every outbound request so a hung
     | connection can never block a worker or web request indefinitely. Timeouts
-    | are in seconds, retry sleep in milliseconds.
+    | are in seconds, retry sleep in milliseconds. retry_times counts every
+    | attempt, the first one included, so 1 (or 0) means no retry. Both retry
+    | values take an explicit 0; only a blank or missing one falls back.
     |
     */
 
     'http' => [
         'timeout'         => (int) (env('MINDTWO_WECLAPP_HTTP_TIMEOUT') ?: 60),
         'connect_timeout' => (int) (env('MINDTWO_WECLAPP_HTTP_CONNECT_TIMEOUT') ?: 10),
-        'retry_times'     => (int) (env('MINDTWO_WECLAPP_HTTP_RETRY_TIMES') ?: 3),
-        'retry_sleep'     => (int) (env('MINDTWO_WECLAPP_HTTP_RETRY_SLEEP') ?: 500),
+        'retry_times'     => is_numeric(env('MINDTWO_WECLAPP_HTTP_RETRY_TIMES')) ? (int) env('MINDTWO_WECLAPP_HTTP_RETRY_TIMES') : 3,
+        'retry_sleep'     => is_numeric(env('MINDTWO_WECLAPP_HTTP_RETRY_SLEEP')) ? (int) env('MINDTWO_WECLAPP_HTTP_RETRY_SLEEP') : 500,
     ],
 
     /*

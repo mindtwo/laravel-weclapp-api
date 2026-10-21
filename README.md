@@ -214,6 +214,12 @@ $record = (array) WeclappClient::find('article', $id);
 WeclappClient::put('article', $id, [...$record, 'shortDescription1' => 'x']);
 ```
 
+`PUT` and `DELETE` are retried after a `5xx` or a dropped connection. If the
+first attempt went through and only its answer was lost, the retry can be
+refused although the change was saved — a `version`-guarded `PUT` with a
+conflict, a `DELETE` with a `404`. Re-read the record before treating such a
+failure as lost.
+
 **Refusals are field-level and come in two flavours**, neither of which is a plain
 403 on the endpoint:
 
@@ -302,6 +308,12 @@ fails. A `POST` that gets a `5xx` or no answer fails at once, as on the
 synchronous path: Weclapp may already have created the record, and sending it
 again could create a second one. A refusal (`4xx`) fails at once. A call whose
 batch was cancelled is skipped.
+
+The hour counts from dispatch, so a job delayed by more than an hour fails
+before it sends anything. A job may run for the HTTP timeout plus the connect
+timeout plus 5 seconds (75 s by default); keep the queue connection's
+`retry_after` above that, or a second worker picks up a write that is still in
+flight and sends it again.
 
 Either path emits a `Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted`
 event for every answer Weclapp sends, success or failure, so consumers can react

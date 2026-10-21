@@ -90,6 +90,17 @@ it('reads an explicit writes flag in every common spelling', function (string $v
     ['1', true],
 ]);
 
+it('takes an explicit 0 for the retry settings, meaning no retry and no wait', function () {
+    $config = loadConfigWithEnv([
+        'APP_ENV'                          => 'production',
+        'MINDTWO_WECLAPP_HTTP_RETRY_TIMES' => '0',
+        'MINDTWO_WECLAPP_HTTP_RETRY_SLEEP' => '0',
+    ]);
+
+    expect($config['http']['retry_times'])->toBe(0)
+        ->and($config['http']['retry_sleep'])->toBe(0);
+});
+
 it('honours explicit optional values', function () {
     $config = loadConfigWithEnv([
         'APP_ENV'                      => 'production',
