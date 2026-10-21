@@ -8,6 +8,7 @@ use ArrayAccess;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use LogicException;
 use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
 use Mindtwo\LaravelWeclappApi\Exceptions\WeclappApiCallFailedException;
 use Mindtwo\LaravelWeclappApi\Jobs\WeclappApiCallJob;
@@ -33,6 +34,12 @@ use Throwable;
 class LazyResponseProxy implements ArrayAccess
 {
     protected ?Response $response = null;
+
+    /**
+     * A request that got no answer; it is thrown again on every later access
+     * instead of sending the request a second time.
+     */
+    protected ?ConnectionException $failure = null;
 
     protected WeclappApiCallJob $job;
 
@@ -83,6 +90,10 @@ class LazyResponseProxy implements ArrayAccess
             return $this->response;
         }
 
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
         if ($this->jobRetrieved) {
             throw new RuntimeException('Cannot execute the API call after getJob() has been called.');
         }
@@ -93,6 +104,8 @@ class LazyResponseProxy implements ArrayAccess
         try {
             return $this->response = $this->api->send($this->method, $this->endpoint, $this->body, $this->configure());
         } catch (ConnectionException $e) {
+            $this->failure = $e;
+
             // send() reports responses; a request that never got one is reported here.
             WeclappApiCallCompleted::dispatch($this->endpoint, $this->method, ['error' => $e->getMessage()], 0, false);
 
@@ -145,14 +158,20 @@ class LazyResponseProxy implements ArrayAccess
         return $this->execute()->offsetGet($offset);
     }
 
+    /**
+     * A response is read-only, so this throws without sending the request.
+     */
     public function offsetSet(mixed $offset, mixed $value): void
     {
-        $this->execute()->offsetSet($offset, $value);
+        throw new LogicException('Response data may not be mutated using array access.');
     }
 
+    /**
+     * A response is read-only, so this throws without sending the request.
+     */
     public function offsetUnset(mixed $offset): void
     {
-        $this->execute()->offsetUnset($offset);
+        throw new LogicException('Response data may not be mutated using array access.');
     }
 
     /**

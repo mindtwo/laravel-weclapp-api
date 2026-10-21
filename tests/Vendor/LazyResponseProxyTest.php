@@ -140,6 +140,36 @@ describe('a proxy nobody reads', function () {
         expect($calls)->toBe(1);
     });
 
+    it('throws the same connection error again instead of resending when touched after it', function () {
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            $calls++;
+
+            throw new ConnectionException('timed out');
+        });
+
+        $proxy = WeclappClient::tickets()->delete(9);
+
+        expect(fn () => $proxy->status())->toThrow(ConnectionException::class, 'timed out')
+            ->and(fn () => $proxy->status())->toThrow(ConnectionException::class, 'timed out')
+            ->and($calls)->toBe(1);
+    });
+
+    it('refuses array writes without sending the request', function () {
+        Http::fake();
+
+        $proxy = WeclappClient::tickets()->delete(9);
+
+        expect(fn () => $proxy['id'] = 1)->toThrow(LogicException::class)
+            ->and(function () use ($proxy) {
+                unset($proxy['id']);
+            })->toThrow(LogicException::class);
+
+        Http::assertNothingSent();
+
+        $proxy->getJob();
+    });
+
     it('reports rather than throws a failure of the late send', function () {
         Http::fake(fn () => throw new ConnectionException('timed out'));
         $handler = Mockery::mock(ExceptionHandler::class);

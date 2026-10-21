@@ -119,7 +119,9 @@ class WeclappApiCallJob implements ShouldQueue
             return;
         }
 
-        Log::warning('Weclapp API call failed (terminal)', [
+        $channel = config('weclapp-api.logging.channel');
+
+        Log::channel(is_string($channel) && $channel !== '' ? $channel : null)->warning('Weclapp API call failed (terminal)', [
             'endpoint' => $this->endpoint,
             'method'   => $this->method,
             'status'   => $response->status(),

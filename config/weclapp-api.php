@@ -139,6 +139,11 @@ return [
     | README). Reads emit nothing. Useful for auditing outbound writes; off by
     | default.
     |
+    | Two log lines are written whether or not event logging is enabled: a
+    | suppressed write (at info) and a queued call that fails for good (at
+    | warning). Both use the channel below; the level applies to event logging
+    | only.
+    |
     */
 
     'logging' => [
