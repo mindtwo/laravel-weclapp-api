@@ -93,12 +93,13 @@ it('splits date fields out of the field map', function () {
         ->and($blueprint->dates()['last_modified'])->toBe('lastModifiedDate');
 });
 
-it('keeps weclapp_id even when --only omits it', function () {
-    // Without it the synchronizer has nothing to match on.
+it('keeps weclapp_id and last_modified even when --only omits them', function () {
+    // Without them the synchronizer has nothing to match on, and weclapp:update
+    // has no lastModifiedDate to filter by.
     $filtered = MirrorBlueprint::filtered(MirrorBlueprint::for('articlePrice'), ['price']);
 
-    expect(array_column($filtered->columns, 'name'))->toContain('weclapp_id', 'price')
-        ->and($filtered->columns)->toHaveCount(2);
+    expect(array_column($filtered->columns, 'name'))->toContain('weclapp_id', 'last_modified', 'price')
+        ->and($filtered->columns)->toHaveCount(3);
 });
 
 it('reads the schema from the GET-by-id response, which is not always the resource name', function () {

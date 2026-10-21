@@ -49,14 +49,16 @@ class MirrorBlueprint
     }
 
     /**
-     * The same blueprint narrowed to a chosen set of API fields. `id` is always
-     * kept — without weclapp_id the synchronizer has nothing to match on.
+     * The same blueprint narrowed to a chosen set of API fields. `id` and
+     * `lastModifiedDate` are always kept: without weclapp_id the synchronizer has
+     * nothing to match on, and without last_modified weclapp:update skips the
+     * mirror, leaving it to full syncs only.
      *
      * @param list<string> $fields
      */
     public static function filtered(self $blueprint, array $fields): self
     {
-        $keep = array_merge($fields, ['id']);
+        $keep = array_merge($fields, ['id', 'lastModifiedDate']);
 
         $columns = array_values(array_filter(
             $blueprint->columns,
