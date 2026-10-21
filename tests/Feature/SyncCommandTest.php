@@ -599,6 +599,25 @@ it('restores an archived row onto itself when the record comes back', function (
         ->and(Article::query()->firstOrFail()->id)->toBe($article->id);
 });
 
+it('restores an archived row onto itself on a delta update too', function () {
+    // The path that repairs a row a full sync archived while an update ran.
+    $article = Article::factory()->create(['weclapp_id' => 20003, 'article_number' => 'OLD']);
+    $article->delete();
+
+    Http::fake(['*article*' => Http::response(['result' => [[
+        'id'               => 20003,
+        'articleNumber'    => 'CHANGED',
+        'lastModifiedDate' => 1767225600000,
+    ]]], 200)]);
+
+    $this->artisan('weclapp:update articles')->assertSuccessful();
+
+    Http::assertSent(fn ($request) => str_contains(urldecode($request->url()), 'lastModifiedDate-gt'));
+    expect(Article::withTrashed()->count())->toBe(1)
+        ->and(Article::query()->firstOrFail()->id)->toBe($article->id)
+        ->and(Article::query()->firstOrFail()->article_number)->toBe('CHANGED');
+});
+
 it('never archives on a delta sync, where a partial result is the whole point', function () {
     Article::factory()->create(['weclapp_id' => 20001]);
     Article::factory()->create(['weclapp_id' => 20002]);
