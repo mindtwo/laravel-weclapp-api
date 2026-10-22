@@ -1,13 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
-#export NVM_DIR="$HOME/.nvm"
+# Husky runs hooks with `sh -e`, whatever the shebang says: POSIX only.
 
-[[ -s "$NVM_DIR/nvm.sh" ]] && \. "$NVM_DIR/nvm.sh"
+# Husky owns core.hooksPath once `npm ci` has run, so GrumPHP's own hook in
+# .git/hooks never fires; call it here the way that hook does, with the staged
+# diff on stdin, so the linter still runs on every commit.
+DIFF=$(git -c diff.mnemonicprefix=false -c diff.noprefix=false --no-pager diff --raw -r -p -m -M --full-index --no-color --staged | cat)
 
-if test -f ".nvmrc"; then
-    nvm use
-fi
+export GRUMPHP_GIT_WORKING_DIR="$(git rev-parse --show-toplevel)"
 
-corepack enable
-
-pnpm test
+printf "%s\n" "${DIFF}" | vendor/bin/grumphp git:pre-commit --skip-success-output

@@ -6,7 +6,6 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
 pest-coverage-output.xml*
 
@@ -59,10 +58,9 @@ bower_components
 build/Release
 
 # Dependency directories
-.pnpm-store
 jspm_packages
 node_modules
-vendor
+/vendor
 
 # TypeScript v1 declaration files
 typings
@@ -130,7 +128,14 @@ sw.*
 *.swp
 
 # "AI"
+/.ai/plans/*
+!/.ai/plans/.gitkeep
+/.claude/*.lock
 /.claude/settings.local.json
+# Agent scratch space: run logs, DB snapshots and hand-off notes. Never committed —
+# GrumPHP intent-adds untracked files when it stashes, so without this entry these
+# artefacts get swept into unrelated commits.
+/.context
 /.junie/mcp/mcp.json
 
 # ----
@@ -154,5 +159,17 @@ Thumbs.db
 # custom project files and directories
 .env
 /package.xml
-build/phpstan
+# All generated build output: phpstan cache, coverage reports, junit logs.
+# Broader than the old `build/phpstan` so a coverage run stops staging itself.
+# Root-anchored on purpose: a bare `build` would also swallow `public/build` and any
+# nested build directory, which is more than intended.
+/build
 report.junit.xml
+# Written by release.config.cjs on every load and only removed after a
+# successful release, so a dry run or a failed run leaves them behind.
+/sha256sums.txt
+/md5sums.txt
+/b2sums.txt
+
+# Local code-review output (mindtwo-dev:review-code)
+/.code-review/

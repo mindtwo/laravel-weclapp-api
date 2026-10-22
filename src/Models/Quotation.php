@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Mindtwo\LaravelWeclappApi\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Mindtwo\LaravelWeclappApi\Database\Factories\QuotationFactory;
+
+/**
+ * @property int $id
+ * @property int|null $customer_id
+ * @property int $weclapp_id
+ * @property string|null $gross_amount
+ * @property \Illuminate\Support\Carbon|null $last_modified
+ * @property string|null $net_amount
+ * @property string|null $quotation_number
+ * @property string|null $status
+ * @property int|null $quotation_version
+ * @property int|null $version
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ */
+class Quotation extends Model
+{
+    /** @use HasFactory<QuotationFactory> */
+    use HasFactory;
+    use SoftDeletes;
+
+    protected $table = 'weclapp_quotations';
+
+    protected $fillable = [
+        'customer_id',
+        'gross_amount',
+        'last_modified',
+        'net_amount',
+        'quotation_number',
+        'status',
+        'quotation_version',
+        'version',
+        'weclapp_id',
+    ];
+
+    protected static function newFactory(): QuotationFactory
+    {
+        return QuotationFactory::new();
+    }
+
+    /**
+     * @return BelongsTo<Party, $this>
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Party::class, 'customer_id', 'weclapp_id');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'customer_id'       => 'integer',
+            'gross_amount'      => 'decimal:5',
+            'last_modified'     => 'datetime',
+            'net_amount'        => 'decimal:5',
+            'quotation_version' => 'integer',
+            'version'           => 'integer',
+            'weclapp_id'        => 'integer',
+        ];
+    }
+}

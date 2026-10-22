@@ -5,9 +5,14 @@ on:
     paths:
       - '**.php'
       - '.github/workflows/run-tests.yml'
-      - '../../phpunit.xml'
+      - 'phpunit.xml'
+      - 'testbench.yaml'
       - 'composer.json'
       - 'composer.lock'
+      # Read by the suite: ConfigEnvNamesTest pins .env.example to the config,
+      # and the spec-conformance, mirror and registry tests read the vendored spec.
+      - '.env.example'
+      - 'docs/specifications/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,11 +29,13 @@ jobs:
         php: [8.5]
         laravel: [12.*, 13.*]
         stability: [prefer-lowest, prefer-stable]
+        # The testbench floors. prefer-lowest resolves the framework to the
+        # lowest version these require, not to composer.json's ^12.0 / ^13.0.
         include:
           - laravel: 13.*
-            testbench: 11.*
+            testbench: ^11.1
           - laravel: 12.*
-            testbench: 10.*
+            testbench: ^10.12
 
     name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
 
@@ -51,7 +58,7 @@ jobs:
       - name: Install dependencies
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+          composer update --${{ matrix.stability }} --no-interaction
 
       - name: List Installed Dependencies
         run: composer show -D

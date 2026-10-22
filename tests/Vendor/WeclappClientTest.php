@@ -1,0 +1,630 @@
+<?php
+
+declare(strict_types=1);
+
+use Carbon\CarbonInterval;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
+use Mindtwo\LaravelWeclappApi\Events\WeclappApiCallCompleted;
+use Mindtwo\LaravelWeclappApi\Facades\WeclappClient;
+use Mindtwo\LaravelWeclappApi\WeclappClient as Client;
+
+/**
+ * The query string of a faked GET request, decoded; Request::offsetGet reads
+ * the body, which a GET does not have.
+ *
+ * @return array<string, string>
+ */
+function query(Illuminate\Http\Client\Request $request): array
+{
+    parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+    return $query;
+}
+
+beforeEach(function () {
+    config()->set('weclapp-api.base_url', 'https://tenant.weclapp.com/webapp/api/v2/');
+    config()->set('weclapp-api.token', 'test-token');
+    config()->set('weclapp-api.page_size', 2);
+});
+
+it('resolves the client as a singleton from the container', function () {
+    expect(app(Client::class))->toBeInstanceOf(Client::class)
+        ->and(app(Client::class))->toBe(app(Client::class));
+});
+
+it('sends the authentication token header on requests', function () {
+    Http::fake([
+        '*' => Http::response(['result' => []], 200),
+    ]);
+
+    WeclappClient::get('party');
+
+    Http::assertSent(fn ($request) => $request->hasHeader('AuthenticationToken', 'test-token')
+        && $request->hasHeader('Accept', 'application/json'));
+});
+
+it('walks a collection by id cursor until an empty page comes back', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '1'], ['id' => '2']]], 200)
+        ->push(['result' => [['id' => '3']]], 200)
+        ->push(['result' => []], 200);
+
+    $result = WeclappClient::get('party');
+
+    expect($result)->toBeInstanceOf(Collection::class)
+        ->and($result)->toHaveCount(3);
+
+    Http::assertSentCount(3);
+    Http::assertSentInOrder([
+        fn ($request) => query($request)['sort'] === 'id' && query($request)['page'] === '1' && ! isset(query($request)['id-gt']),
+        fn ($request) => query($request)['sort'] === 'id' && query($request)['page'] === '1' && query($request)['id-gt'] === '2',
+        fn ($request) => query($request)['id-gt'] === '3',
+    ]);
+});
+
+describe('lazy()', function () {
+    it('keeps every record when collected, numbering them across pages', function () {
+        Http::fakeSequence()
+            ->push(['result' => [['id' => '1'], ['id' => '2']]], 200)
+            ->push(['result' => [['id' => '3']]], 200)
+            ->push(['result' => []], 200);
+
+        expect(array_keys(WeclappClient::lazy('party')->all()))->toBe([0, 1, 2]);
+    });
+
+    it('refuses page and offset, which address a single page', function (array $params) {
+        Http::fake();
+
+        expect(fn () => WeclappClient::lazy('party', $params))->toThrow(InvalidArgumentException::class);
+
+        Http::assertNothingSent();
+    })->with([
+        'page'   => [['page' => 2]],
+        'offset' => [['offset' => 10]],
+    ]);
+});
+
+it('keeps reading past a short page, since a resource may cap the page size below the configured one', function () {
+    // page_size is 2 here; a cap of 1 would make every page short.
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '1']]], 200)
+        ->push(['result' => [['id' => '2']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('party'))->toHaveCount(2);
+
+    Http::assertSentCount(3);
+});
+
+it('pages by offset when the caller orders the result itself, until an empty page', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '9'], ['id' => '8']]], 200)
+        ->push(['result' => [['id' => '7']]], 200)
+        ->push(['result' => [['id' => '6']]], 200)
+        ->push(['result' => []], 200);
+
+    // A short page is not the end: a resource may cap its pages below the configured size.
+    expect(WeclappClient::get('party', ['sort' => '-id']))->toHaveCount(4);
+
+    Http::assertSentCount(4);
+    Http::assertSentInOrder([
+        fn ($request) => query($request)['sort'] === '-id' && query($request)['page'] === '1' && ! isset(query($request)['id-gt']),
+        fn ($request) => query($request)['sort'] === '-id' && query($request)['page'] === '2' && ! isset(query($request)['id-gt']),
+        fn ($request) => query($request)['page'] === '3',
+        fn ($request) => query($request)['page'] === '4',
+    ]);
+});
+
+it('pages by offset when the caller orders with orderBy, sending no cursor sort', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '3'], ['id' => '1']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('article', ['orderBy' => 'articleNumber']))->toHaveCount(2);
+
+    Http::assertSent(fn ($request) => query($request)['orderBy'] === 'articleNumber'
+        && ! isset(query($request)['sort'])
+        && ! isset(query($request)['id-gt']));
+});
+
+it('fails loudly when an offset page repeats, instead of looping forever', function () {
+    Http::fake(['*' => Http::response(['result' => [['id' => '9'], ['id' => '8']]], 200)]);
+
+    expect(fn () => WeclappClient::get('party', ['sort' => '-id']))
+        ->toThrow(UnexpectedValueException::class, 'ignored the page parameter');
+
+    Http::assertSentCount(2);
+});
+
+it('adds id to a partial response so the cursor can move on', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '1', 'name' => 'a'], ['id' => '2', 'name' => 'b']]], 200)
+        ->push(['result' => [['id' => '3', 'name' => 'c']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('article', ['properties' => 'name']))->toHaveCount(3);
+
+    Http::assertSent(fn ($request) => query($request)['properties'] === 'name,id');
+});
+
+it('keeps a properties list that already names id', function () {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('article', ['properties' => 'id,name']);
+
+    Http::assertSent(fn ($request) => query($request)['properties'] === 'id,name');
+});
+
+it('refuses an offset without a page, since every page would skip it', function () {
+    Http::fake();
+
+    expect(fn () => WeclappClient::get('article', ['offset' => 50]))
+        ->toThrow(InvalidArgumentException::class, 'pass `page`');
+
+    Http::assertNothingSent();
+});
+
+it('pages by offset when the caller filters on the id', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '5'], ['id' => '6']]], 200)
+        ->push(['result' => []], 200);
+
+    expect(WeclappClient::get('party', ['id-in' => '[5,6]']))->toHaveCount(2);
+
+    Http::assertSentInOrder([
+        fn ($request) => ! isset(query($request)['sort']) && query($request)['page'] === '1',
+        fn ($request) => ! isset(query($request)['sort']) && query($request)['page'] === '2',
+    ]);
+});
+
+it('fetches the next page lazily, only once the records before it are consumed', function () {
+    Http::fakeSequence()
+        ->push(['result' => [['id' => '1'], ['id' => '2']]], 200)
+        ->push(['result' => [['id' => '3']]], 200)
+        ->push(['result' => []], 200);
+
+    $records = WeclappClient::lazy('party');
+
+    Http::assertSentCount(0);
+
+    // Requests sent by the time each record arrives.
+    $sentAt = [];
+
+    foreach ($records as $record) {
+        $sentAt[$record->id] = count(Http::recorded());
+    }
+
+    expect($sentAt)->toBe([1 => 1, 2 => 1, 3 => 2]);
+
+    Http::assertSentCount(3);
+});
+
+it('fails on a page whose records carry no id rather than returning it as the whole collection', function () {
+    Http::fake(['*' => Http::response(['result' => [['name' => 'no id']]], 200)]);
+
+    expect(fn () => WeclappClient::get('party'))->toThrow(UnexpectedValueException::class, 'without an id');
+
+    Http::assertSentCount(1);
+});
+
+it('appends the dryRun flag to a post when requested', function () {
+    Http::fake(['*' => Http::response(['id' => 'q-1'], 201)]);
+
+    WeclappClient::post('quotation', ['foo' => 'bar'], dryRun: true);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'quotation?dryRun=true')
+        && $request->method() === 'POST');
+});
+
+it('returns null when finding a missing record', function () {
+    Http::fake(['*' => Http::response('', 404)]);
+
+    expect(WeclappClient::find('party', 'nope'))->toBeNull();
+});
+
+it('puts to an arbitrary record without a typed endpoint class', function () {
+    Http::fake(['*' => Http::response(['id' => '7'], 200)]);
+
+    $result = WeclappClient::put('warehouseStock', 7, ['quantity' => 3]);
+
+    expect($result)->toBe(['id' => '7']);
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/warehouseStock/id/7')
+        && $request->method() === 'PUT'
+        && $request['quantity'] === 3);
+});
+
+it('deletes an arbitrary record without a typed endpoint class', function () {
+    Http::fake(['*' => Http::response('', 204)]);
+
+    expect(WeclappClient::delete('ticket', 9))->toBeTrue();
+
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/ticket/id/9')
+        && $request->method() === 'DELETE');
+});
+
+it('appends the dryRun flag to a delete when requested', function () {
+    Http::fake(['*' => Http::response('', 204)]);
+
+    WeclappClient::delete('ticket', 9, dryRun: true);
+
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/ticket/id/9?dryRun=true')
+        && $request->method() === 'DELETE');
+});
+
+it('throws when a generic write fails', function () {
+    Http::fake(['*' => Http::response(['error' => 'nope'], 422)]);
+
+    WeclappClient::put('ticket', 1, []);
+})->throws(RequestException::class);
+
+it('downloads a binary document from a resource sub-path', function () {
+    Http::fake(['*downloadMainArticleImage*' => Http::response('binary-jpeg-bytes', 200, [
+        'Content-Type' => 'image/jpeg',
+    ])]);
+
+    $response = app(Client::class)->download('article/id/1964/downloadMainArticleImage');
+
+    expect($response)->not->toBeNull()
+        ->and($response->body())->toBe('binary-jpeg-bytes')
+        ->and($response->header('Content-Type'))->toBe('image/jpeg');
+});
+
+it('returns null when downloading a document that does not exist', function () {
+    Http::fake(['*downloadMainArticleImage*' => Http::response('', 404)]);
+
+    expect(app(Client::class)->download('article/id/999/downloadMainArticleImage'))->toBeNull();
+});
+
+it('throws when a download is refused rather than reporting no document', function () {
+    Http::fake(['*downloadMainArticleImage*' => Http::response('', 403)]);
+
+    app(Client::class)->download('article/id/1964/downloadMainArticleImage');
+})->throws(RequestException::class);
+
+it('appends the dryRun flag to a put when requested', function () {
+    Http::fake(['*' => Http::response(['id' => '1964'], 200)]);
+
+    WeclappClient::put('article', 1964, ['name' => 'Widget'], dryRun: true);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'article/id/1964?dryRun=true')
+        && $request->method() === 'PUT'
+        && $request['name'] === 'Widget');
+});
+
+it('does not append the dryRun flag to a put by default', function () {
+    Http::fake(['*' => Http::response([], 200)]);
+
+    WeclappClient::put('article', 1964, []);
+
+    Http::assertSent(fn ($request) => ! str_contains($request->url(), 'dryRun')
+        && str_ends_with($request->url(), '/article/id/1964'));
+});
+
+it('sends a partial put with ignoreMissingProperties, alongside dryRun when both are asked for', function () {
+    Http::fake(['*' => Http::response(['id' => '5'], 200)]);
+
+    WeclappClient::put('article', 5, ['version' => '2', 'name' => 'x'], partial: true);
+    WeclappClient::put('article', 5, ['version' => '2', 'name' => 'x'], dryRun: true, partial: true);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/article/id/5?ignoreMissingProperties=true')
+        && ! str_contains($request->url(), 'dryRun'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'dryRun=true')
+        && str_contains($request->url(), 'ignoreMissingProperties=true'));
+});
+
+it('suppresses a dry-run put too, since it still leaves the environment', function () {
+    config()->set('weclapp-api.writes_enabled', false);
+    Http::fake();
+
+    expect(WeclappClient::put('article', 1964, ['name' => 'Widget'], dryRun: true))->toBe([]);
+
+    Http::assertNothingSent();
+});
+
+it('uploads bytes as a raw body with the filename in the query, not multipart', function () {
+    Http::fake(['*uploadArticleImage*' => Http::response(['result' => ['id' => '2052097']], 200)]);
+
+    $result = app(Client::class)->upload(
+        'article/id/1964/uploadArticleImage',
+        'binary-jpeg-bytes',
+        'header.jpeg',
+        'image/jpeg',
+        ['mainImage' => 'true'],
+    );
+
+    expect($result)->toBe(['result' => ['id' => '2052097']]);
+
+    Http::assertSent(function ($request) {
+        return $request->method() === 'POST'
+            && $request->body() === 'binary-jpeg-bytes'
+            && $request->hasHeader('Content-Type', 'image/jpeg')
+            && str_contains($request->url(), 'name=header.jpeg')
+            && str_contains($request->url(), 'mainImage=true');
+    });
+});
+
+it('returns null when uploading against a record that does not exist', function () {
+    Http::fake(['*uploadArticleImage*' => Http::response('', 404)]);
+
+    expect(app(Client::class)->upload('article/id/999/uploadArticleImage', 'bytes', 'a.jpg'))->toBeNull();
+});
+
+it('throws when an upload is refused rather than reporting no record', function () {
+    Http::fake(['*uploadArticleImage*' => Http::response('', 403)]);
+
+    app(Client::class)->upload('article/id/1964/uploadArticleImage', 'bytes', 'a.jpg');
+})->throws(RequestException::class);
+
+it('suppresses an upload when writes are disabled', function () {
+    config()->set('weclapp-api.writes_enabled', false);
+    Http::fake();
+
+    expect(app(Client::class)->upload('article/id/1964/uploadArticleImage', 'bytes', 'a.jpg'))->toBe([]);
+
+    Http::assertNothingSent();
+});
+
+describe('retry policy', function () {
+    beforeEach(function () {
+        config()->set('weclapp-api.http.retry_times', 3);
+        config()->set('weclapp-api.http.retry_sleep', 0);
+    });
+
+    it('does not retry a 404 when finding a record', function () {
+        Http::fake(['*' => Http::response('', 404)]);
+
+        expect(WeclappClient::find('party', 'nope'))->toBeNull();
+
+        Http::assertSentCount(1);
+    });
+
+    it('does not retry a refused write', function () {
+        Http::fake(['*' => Http::response(['detail' => 'invalid'], 422)]);
+
+        expect(fn () => WeclappClient::post('quotation', ['foo' => 'bar']))->toThrow(RequestException::class);
+
+        Http::assertSentCount(1);
+    });
+
+    // The fake does not record a request whose handler throws, so these two
+    // count the attempts themselves instead of using assertSentCount().
+    it('does not retry a post after a connection error, since Weclapp may have processed it', function () {
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            $calls++;
+
+            throw new ConnectionException('timed out');
+        });
+
+        expect(fn () => WeclappClient::post('quotation', ['foo' => 'bar']))->toThrow(ConnectionException::class)
+            ->and($calls)->toBe(1);
+    });
+
+    it('does not retry a post on a server error', function () {
+        Http::fake(['*' => Http::response('', 502)]);
+
+        expect(fn () => WeclappClient::post('quotation', ['foo' => 'bar']))->toThrow(RequestException::class);
+
+        Http::assertSentCount(1);
+    });
+
+    it('retries a read on a server error', function () {
+        Http::fakeSequence()
+            ->push('', 503)
+            ->push('', 503)
+            ->push(['result' => [['id' => '1']]], 200)
+            ->push(['result' => []], 200);
+
+        expect(WeclappClient::get('party'))->toHaveCount(1);
+
+        Http::assertSentCount(4);
+    });
+
+    it('retries a read after a connection error', function () {
+        $calls = 0;
+        Http::fake(function () use (&$calls) {
+            if (++$calls < 2) {
+                throw new ConnectionException('timed out');
+            }
+
+            return Http::response(['result' => []], 200);
+        });
+
+        expect(WeclappClient::get('party'))->toHaveCount(0)
+            ->and($calls)->toBe(2);
+    });
+
+    it('retries a post that was rate limited, honouring Retry-After', function () {
+        Sleep::fake();
+        Http::fakeSequence()
+            ->push('', 429, ['Retry-After' => '2'])
+            ->push(['id' => 'q-1'], 201);
+
+        expect(WeclappClient::post('quotation', ['foo' => 'bar']))->toBe(['id' => 'q-1']);
+
+        Http::assertSentCount(2);
+        Sleep::assertSlept(fn (CarbonInterval $duration) => $duration->totalMilliseconds === 2000.0);
+    });
+
+    it('backs off exponentially on a 429 without Retry-After, and linearly otherwise', function () {
+        config()->set('weclapp-api.http.retry_sleep', 500);
+        Sleep::fake();
+        Http::fakeSequence()
+            ->push('', 429)
+            ->push('', 429)
+            ->push(['id' => '5'], 200)
+            ->push('', 503)
+            ->push('', 503)
+            ->push(['id' => '5'], 200);
+
+        WeclappClient::put('article', 5, ['name' => 'x']);
+        WeclappClient::put('article', 5, ['name' => 'x']);
+
+        // 429: 1 s, 2 s; 5xx: 0.5 s, 1 s.
+        Sleep::assertSequence([
+            Sleep::for(1000)->milliseconds(),
+            Sleep::for(2000)->milliseconds(),
+            Sleep::for(500)->milliseconds(),
+            Sleep::for(1000)->milliseconds(),
+        ]);
+    });
+
+    it('retries an idempotent put on a server error', function () {
+        Http::fakeSequence()
+            ->push('', 500)
+            ->push(['id' => '5'], 200);
+
+        expect(WeclappClient::put('article', 5, ['name' => 'x']))->toBe(['id' => '5']);
+
+        Http::assertSentCount(2);
+    });
+});
+
+describe('id cursor safety', function () {
+    it('treats a repeated short page as the end of the collection', function () {
+        // A fake that ignores the cursor hands the same page back; the first
+        // page already held everything, so the result is still complete.
+        Http::fake(['*' => Http::response(['result' => [['id' => '1']]], 200)]);
+
+        expect(WeclappClient::get('party'))->toHaveCount(1);
+
+        Http::assertSentCount(2);
+    });
+
+    it('fails loudly when a full page repeats, since everything behind it would be lost', function () {
+        Http::fake(['*' => Http::response(['result' => [['id' => '1'], ['id' => '2']]], 200)]);
+
+        expect(fn () => WeclappClient::get('party'))->toThrow(RuntimeException::class, 'ignored the id cursor');
+    });
+});
+
+describe('completion events for writes', function () {
+    beforeEach(function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+    });
+
+    it('reports a sent post with its real status', function () {
+        Http::fake(['*' => Http::response(['id' => 'q-1'], 201)]);
+
+        WeclappClient::post('quotation', ['foo' => 'bar']);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'POST'
+            && $e->endpoint === 'quotation'
+            && $e->statusCode === 201
+            && $e->successful === true
+            && $e->suppressed === false);
+    });
+
+    it('reports a sent put and delete with the record path', function () {
+        Http::fake(['*' => Http::response(['id' => '9'], 200)]);
+
+        WeclappClient::put('article', 9, ['name' => 'x']);
+        WeclappClient::delete('article', 9);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'PUT' && $e->endpoint === 'article/id/9');
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'DELETE' && $e->endpoint === 'article/id/9');
+    });
+
+    it('reports a refused write as unsuccessful before throwing', function () {
+        Http::fake(['*' => Http::response(['detail' => 'nope'], 422)]);
+
+        expect(fn () => WeclappClient::post('quotation', []))->toThrow(RequestException::class);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 422 && $e->successful === false);
+    });
+
+    it('reports an upload', function () {
+        Http::fake(['*' => Http::response(['id' => 'img-1'], 200)]);
+
+        WeclappClient::upload('article/id/9/uploadArticleImage', 'bytes', 'a.png', 'image/png');
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->method === 'POST'
+            && $e->endpoint === 'article/id/9/uploadArticleImage'
+            && $e->successful === true);
+    });
+
+    it('names the record path on a suppressed put, like the proxy does', function () {
+        config()->set('weclapp-api.writes_enabled', false);
+        Http::fake();
+
+        WeclappClient::put('article', 9, ['name' => 'x']);
+
+        Http::assertNothingSent();
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->suppressed === true && $e->endpoint === 'article/id/9');
+    });
+
+    it('reports a low-level write as final', function () {
+        Http::fake(['*' => Http::response(['id' => 'q-1'], 201)]);
+
+        WeclappClient::post('quotation', ['foo' => 'bar']);
+
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->final === true && $e->isFinal());
+    });
+
+    it('reports nothing for a read', function () {
+        Http::fakeSequence()->push(['result' => [['id' => '1']]], 200)->push(['result' => []], 200);
+
+        WeclappClient::get('party');
+
+        Event::assertNotDispatched(WeclappApiCallCompleted::class);
+    });
+});
+
+it('returns an empty array for a post whose success has no body', function () {
+    Http::fake(['*' => Http::response('', 204)]);
+
+    expect(WeclappClient::post('salesOrder/id/5/createInvoice', []))->toBe([]);
+});
+
+it('refuses to send without a base url or a token, naming the setting', function () {
+    config()->set('weclapp-api.base_url', '');
+    expect(fn () => WeclappClient::get('party'))->toThrow(RuntimeException::class, 'MINDTWO_WECLAPP_URL');
+
+    config()->set('weclapp-api.base_url', 'https://tenant.weclapp.com/webapp/api/v2/');
+    config()->set('weclapp-api.token', '');
+    expect(fn () => WeclappClient::get('party'))->toThrow(RuntimeException::class, 'MINDTWO_WECLAPP_API_KEY');
+});
+
+it('identifies itself with a User-Agent, as the spec asks of automated clients', function () {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('party');
+
+    Http::assertSent(fn ($request) => $request->hasHeader('User-Agent', 'mindtwo/laravel-weclapp-api'));
+});
+
+it('returns just the requested page when the caller asks for one', function () {
+    Http::fake(['*' => Http::response(['result' => [['id' => '7'], ['id' => '8']]], 200)]);
+
+    expect(WeclappClient::get('party', ['page' => 3, 'pageSize' => 2]))->toHaveCount(2);
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request) => query($request)['page'] === '3'
+        && query($request)['pageSize'] === '2'
+        && query($request)['sort'] === 'id'
+        && ! isset(query($request)['id-gt']));
+});
+
+it('keeps the caller\'s own order on a requested page', function (array $order) {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('party', ['page' => 1, ...$order]);
+
+    Http::assertSent(fn ($request) => array_intersect_key(query($request), ['sort' => 0, 'orderBy' => 0]) === $order);
+})->with([
+    'sort'    => [['sort' => '-lastModifiedDate']],
+    'orderBy' => [['orderBy' => 'company']],
+]);
+
+it('clamps a requested page size to what Weclapp allows', function () {
+    Http::fake(['*' => Http::response(['result' => []], 200)]);
+
+    WeclappClient::get('party', ['page' => 1, 'pageSize' => 5000]);
+
+    Http::assertSent(fn ($request) => query($request)['pageSize'] === '1000');
+});

@@ -1,0 +1,189 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Mindtwo\LaravelWeclappApi\Spec;
+
+use Illuminate\Support\Str;
+
+/**
+ * Turns a resolved OpenAPI schema into the column plan for a mirror table.
+ *
+ * A SyncDefinition maps flat scalars of one record into one row, so nested
+ * collections and object references are dropped here rather than guessed at —
+ * they are the consumer's job. Every decision is derived from the spec: types
+ * from `type`/`format`, string lengths from `maxLength`, factory values from the
+ * enum a property `$ref`s.
+ */
+class MirrorBlueprint
+{
+    /** @param  list<array<string, mixed>>  $columns */
+    private function __construct(
+        public readonly string $resource,
+        public readonly array $columns,
+        /** @var array<string, string> */
+        public readonly array $skipped,
+    ) {}
+
+    public static function for(string $resource): self
+    {
+        $columns = [];
+        $skipped = [];
+
+        foreach (SpecReader::properties(SpecReader::schemaFor($resource) ?? $resource) as $name => $property) {
+            $column = self::column($name, $property);
+
+            if (is_string($column)) {
+                $skipped[$name] = $column;
+
+                continue;
+            }
+
+            $columns[] = $column;
+        }
+
+        // Ids first, then alphabetically, so a generated migration reads like the shipped ones.
+        usort($columns, fn (array $a, array $b): int => [$b['is_id'], $a['name']] <=> [$a['is_id'], $b['name']]);
+
+        return new self($resource, $columns, $skipped);
+    }
+
+    /**
+     * The same blueprint narrowed to a chosen set of API fields. `id` and
+     * `lastModifiedDate` are always kept: without weclapp_id the synchronizer has
+     * nothing to match on, and without last_modified weclapp:update skips the
+     * mirror, leaving it to full syncs only.
+     *
+     * @param list<string> $fields
+     */
+    public static function filtered(self $blueprint, array $fields): self
+    {
+        $keep = array_merge($fields, ['id', 'lastModifiedDate']);
+
+        $columns = array_values(array_filter(
+            $blueprint->columns,
+            fn (array $column): bool => in_array($column['source'], $keep, true),
+        ));
+
+        return new self($blueprint->resource, $columns, $blueprint->skipped);
+    }
+
+    public function table(): string
+    {
+        return 'weclapp_'.Str::snake(Str::pluralStudly(ucfirst($this->resource)));
+    }
+
+    public function modelClass(): string
+    {
+        return ucfirst($this->resource);
+    }
+
+    /**
+     * Columns filled from a plain field, keyed column => API field.
+     *
+     * @return array<string, string>
+     */
+    public function map(): array
+    {
+        $map = [];
+
+        foreach ($this->columns as $column) {
+            if (! $column['is_date']) {
+                $map[$column['name']] = $column['source'];
+            }
+        }
+
+        ksort($map);
+
+        return $map;
+    }
+
+    /**
+     * Columns filled from an epoch-millisecond field, keyed column => API field.
+     *
+     * @return array<string, string>
+     */
+    public function dates(): array
+    {
+        $dates = [];
+
+        foreach ($this->columns as $column) {
+            if ($column['is_date']) {
+                $dates[$column['name']] = $column['source'];
+            }
+        }
+
+        ksort($dates);
+
+        return $dates;
+    }
+
+    /**
+     * @param array<string, mixed> $property
+     *
+     * @return array<string, mixed>|string a column definition, or the reason it was skipped
+     */
+    private static function column(string $name, array $property): array|string
+    {
+        $type = $property['type'] ?? null;
+
+        if ($type === 'array') {
+            return 'nested collection';
+        }
+
+        if ($type === 'object') {
+            return 'nested object';
+        }
+
+        $enum = SpecReader::enumValues($property);
+
+        if ($type === null && isset($property['$ref']) && $enum === null) {
+            return 'embedded object';
+        }
+
+        // The API's own id becomes weclapp_id, the table keeping its own key, and
+        // the modification stamp takes the name every shipped mirror uses.
+        $column = match ($name) {
+            'id'               => 'weclapp_id',
+            'lastModifiedDate' => 'last_modified',
+            default            => Str::snake($name),
+        };
+        $format = $property['format'] ?? null;
+        $maxLength = $property['maxLength'] ?? null;
+
+        // Weclapp serialises every numeric id and the optimistic-lock counter as
+        // a string, so type alone would give varchar columns for integers. The
+        // spec marks a reference with `x-weclapp.entity`; the unmarked `*Id`
+        // strings without a length are references too (parentItemId, imageId),
+        // while a bounded or typed one is data that merely ends in "Id"
+        // (xRechnungLeitwegId, trackingId, validVatId).
+        $isIdentifier = $name === 'id'
+            || isset($property['x-weclapp']['entity'])
+            || (str_ends_with($name, 'Id') && $type === 'string' && $maxLength === null);
+
+        [$migration, $cast] = match (true) {
+            $isIdentifier                                  => ['unsignedBigInteger', 'integer'],
+            $name === 'version'                            => ['integer', 'integer'],
+            $type === 'integer' && $format === 'timestamp' => ['datetime', 'datetime'],
+            $type === 'integer' && $format === 'int64'     => ['bigInteger', 'integer'],
+            $type === 'integer'                            => ['integer', 'integer'],
+            $type === 'boolean'                            => ['boolean', 'boolean'],
+            // The spec's decimal pattern allows 13 integer and 5 fractional digits.
+            $type === 'number' || $format === 'decimal' => ['decimal', 'decimal:5'],
+            $enum !== null                              => ['string', null],
+            is_int($maxLength) && $maxLength <= 255     => ['string', null],
+            default                                     => ['text', null],
+        };
+
+        return [
+            'name'       => $column,
+            'source'     => $name,
+            'migration'  => $migration,
+            'cast'       => $cast,
+            'enum'       => $enum,
+            'max_length' => is_int($maxLength) && $maxLength < 255 ? $maxLength : null,
+            'is_date'    => $migration === 'datetime',
+            'is_id'      => $isIdentifier,
+        ];
+    }
+}
