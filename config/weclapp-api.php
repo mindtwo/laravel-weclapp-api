@@ -62,6 +62,8 @@ return [
     | except the local and testing environments. Override with
     | MINDTWO_WECLAPP_WRITES_ENABLED. An unset or blank variable keeps the
     | default — a blank line in .env must never switch production writes off.
+    | Any other value that is not a boolean refuses to load: guessing would
+    | turn a typo into either silently stopped or unexpectedly live writes.
     |
     */
 
@@ -72,7 +74,11 @@ return [
             return ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true);
         }
 
-        return filter_var($flag, FILTER_VALIDATE_BOOL);
+        return filter_var($flag, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
+            ?? throw new InvalidArgumentException(sprintf(
+                'MINDTWO_WECLAPP_WRITES_ENABLED must be true or false, got "%s".',
+                $flag,
+            ));
     })(),
 
     /*

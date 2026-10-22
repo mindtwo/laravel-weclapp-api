@@ -90,6 +90,11 @@ it('reads an explicit writes flag in every common spelling', function (string $v
     ['1', true],
 ]);
 
+it('refuses a writes flag that is not a boolean instead of guessing', function (string $value) {
+    expect(fn () => loadConfigWithEnv(['APP_ENV' => 'production', 'MINDTWO_WECLAPP_WRITES_ENABLED' => $value]))
+        ->toThrow(InvalidArgumentException::class, 'MINDTWO_WECLAPP_WRITES_ENABLED must be true or false');
+})->with(['ture', 'flase', 'enabled']);
+
 it('takes an explicit 0 for the retry settings, meaning no retry and no wait', function () {
     $config = loadConfigWithEnv([
         'APP_ENV'                          => 'production',
