@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('weclapp_users', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('weclapp_id')->unique();
-            $table->string('email')->nullable();
+            $table->text('email')->nullable();
             $table->string('first_name')->nullable();
             $table->datetime('last_modified')->nullable();
             $table->string('last_name')->nullable();

@@ -584,6 +584,10 @@ table published from an earlier build lacks:
 - `weclapp_parties`: `is_customer`, `is_supplier`;
 - `weclapp_article_categories`: `last_modified`;
 - `weclapp_sales_invoices.description` as `text` instead of `varchar(255)`;
+- `text` instead of `varchar(255)`, since the spec allows up to 1000 characters
+  (256 for a user's email): `weclapp_parties.company`, `company_2`,
+  `customer_number`, `supplier_number`, `email`, `first_name`, `last_name`,
+  `phone`, `website`; `weclapp_articles.article_number`; `weclapp_users.email`;
 - `weclapp_quotations.report_id` is gone, as are the `weclapp_amounts` and
   `weclapp_reports` tables with their `Amount` and `Report` models and
   `Quotation::report()` — none of them was a Weclapp resource;

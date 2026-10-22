@@ -27,7 +27,7 @@ return new class extends Migration
             $table->unsignedBigInteger('unit_id')->nullable();
             $table->unsignedBigInteger('weclapp_id')->unique();
             $table->boolean('active')->default(true);
-            $table->string('article_number')->nullable();
+            $table->text('article_number')->nullable();
             $table->text('description')->nullable();
             $table->datetime('last_modified')->nullable();
             $table->text('long_text')->nullable();
