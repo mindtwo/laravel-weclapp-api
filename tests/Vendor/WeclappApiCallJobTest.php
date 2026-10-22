@@ -89,6 +89,16 @@ describe('retries', function () {
         Http::assertSentCount(1);
     });
 
+    it('treats a 429 as final on the sync driver, where a release would never run again', function () {
+        Event::fake([WeclappApiCallCompleted::class]);
+        Http::fake(['*' => Http::response('', 429, ['Retry-After' => '12'])]);
+
+        dispatch_sync(new WeclappApiCallJob('article/id/9', 'PUT', ['name' => 'New']));
+
+        Http::assertSentCount(1);
+        Event::assertDispatched(WeclappApiCallCompleted::class, fn ($e) => $e->statusCode === 429 && $e->final === true);
+    });
+
     it('releases itself on a server error', function () {
         Event::fake([WeclappApiCallCompleted::class]);
         Http::fake(['*' => Http::response('', 503)]);

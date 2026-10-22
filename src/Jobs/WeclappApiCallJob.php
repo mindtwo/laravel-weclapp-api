@@ -13,6 +13,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\SkipIfBatchCancelled;
 use Illuminate\Queue\SerializesModels;
@@ -181,11 +182,17 @@ class WeclappApiCallJob implements ShouldQueue
     }
 
     /**
-     * Outside a worker there is no budget to check.
+     * Only a real queue worker runs a released job again. On the sync driver,
+     * or when handle() is called without a job, release() is a no-op, so the
+     * attempt has to be final rather than silently dropped.
      */
     private function withinBudget(): bool
     {
-        $until = $this->job?->retryUntil();
+        if ($this->job === null || $this->job instanceof SyncJob) {
+            return false;
+        }
+
+        $until = $this->job->retryUntil();
 
         return $until === null || $until > now()->getTimestamp();
     }

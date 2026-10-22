@@ -312,7 +312,9 @@ a `5xx` or a connection error — for up to an hour from dispatch before it
 fails. A `POST` that gets a `5xx` or no answer fails at once, as on the
 synchronous path: Weclapp may already have created the record, and sending it
 again could create a second one. A refusal (`4xx`) fails at once. A call whose
-batch was cancelled is skipped.
+batch was cancelled is skipped. Retrying needs a real queue worker: on the
+`sync` driver, or when the job is handled directly, nothing would run a
+released job again, so every answer is final there.
 
 The hour counts from dispatch, so a job delayed by more than an hour fails
 before it sends anything. A job may run for the HTTP timeout plus the connect
