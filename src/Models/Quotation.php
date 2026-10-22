@@ -13,7 +13,6 @@ use Mindtwo\LaravelWeclappApi\Database\Factories\QuotationFactory;
 /**
  * @property int $id
  * @property int|null $customer_id
- * @property int|null $status_id
  * @property int $weclapp_id
  * @property string|null $gross_amount
  * @property \Illuminate\Support\Carbon|null $last_modified
@@ -41,7 +40,6 @@ class Quotation extends Model
         'net_amount',
         'quotation_number',
         'status',
-        'status_id',
         'quotation_version',
         'version',
         'weclapp_id',
@@ -70,7 +68,6 @@ class Quotation extends Model
             'gross_amount'      => 'decimal:5',
             'last_modified'     => 'datetime',
             'net_amount'        => 'decimal:5',
-            'status_id'         => 'integer',
             'quotation_version' => 'integer',
             'version'           => 'integer',
             'weclapp_id'        => 'integer',

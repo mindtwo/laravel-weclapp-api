@@ -586,7 +586,9 @@ table published from an earlier build lacks:
 - `weclapp_sales_invoices.description` as `text` instead of `varchar(255)`;
 - `weclapp_quotations.report_id` is gone, as are the `weclapp_amounts` and
   `weclapp_reports` tables with their `Amount` and `Report` models and
-  `Quotation::report()` — none of them was a Weclapp resource.
+  `Quotation::report()` — none of them was a Weclapp resource;
+- `weclapp_quotations.status_id` is gone: a local number for three of the five
+  statuses that no sync ever wrote; `status` holds Weclapp's value.
 
 A mirror holds no data of its own, so the straightforward path is to rebuild
 the tables. The published files keep the package's names, which an earlier
