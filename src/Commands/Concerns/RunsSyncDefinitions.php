@@ -25,8 +25,8 @@ use UnexpectedValueException;
  * fatal, since every entity would fail the same way. A named entity gets no
  * skip: asking for it explicitly means its table is expected to exist.
  *
- * Both commands take the same lock per entity, so a full sync and a delta
- * update never write one mirror at once: racing, they would collide on the
+ * Both commands take the same lock per entity and database, so a full sync and
+ * a delta update never write one mirror at once: racing, they would collide on the
  * unique weclapp_id, and the sync would archive a row the update had just
  * inserted. A held lock skips the entity and fails the run.
  */
@@ -60,7 +60,8 @@ trait RunsSyncDefinitions
         $failed = false;
 
         foreach ($definitions as $slug => $definition) {
-            $table = (new $definition->model)->getTable();
+            $model = new $definition->model;
+            $table = $model->getTable();
 
             if ($entity === null && ! Schema::hasTable($table)) {
                 $this->line(sprintf('Skipped %s: %s is not migrated.', $slug, $table));
@@ -68,7 +69,12 @@ trait RunsSyncDefinitions
                 continue;
             }
 
-            $lock = Cache::lock(self::LOCK_PREFIX.$slug, self::LOCK_SECONDS);
+            // Per database as well: tenants with their own mirror, or apps sharing one
+            // cache store, must not skip each other's entities.
+            $lock = Cache::lock(
+                self::LOCK_PREFIX.$model->getConnection()->getDatabaseName().':'.$slug,
+                self::LOCK_SECONDS,
+            );
 
             if (! $lock->get()) {
                 $this->warn(sprintf('Skipped %s: another weclapp:sync or weclapp:update is running it.', $slug));

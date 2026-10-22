@@ -442,8 +442,10 @@ refuses (for example a `403` on an unlicensed module) is reported and does not
 stop the ones after it; the command then exits non-zero so a scheduler notices.
 
 Two runs of the same entity never overlap: both commands take the same cache
-lock per entity, so a slow nightly `weclapp:sync` and an hourly
-`weclapp:update` cannot write one mirror at once. An entity whose lock is held
+lock per entity and database, so a slow nightly `weclapp:sync` and an hourly
+`weclapp:update` cannot write one mirror at once, while tenants with their own
+database, or apps sharing one cache store, do not block each other. The lock is
+taken by the two commands; calling `EntitySynchronizer` directly bypasses it. An entity whose lock is held
 is skipped with a warning and the run exits non-zero; other entities still
 run. The lock expires after 24 hours, so a crashed run cannot block the mirror
 for longer. It needs a cache store that supports locks (`file`, `database`,

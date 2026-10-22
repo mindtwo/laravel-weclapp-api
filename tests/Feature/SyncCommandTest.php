@@ -19,6 +19,14 @@ use Mindtwo\LaravelWeclappApi\Models\SalesInvoice;
 use Mindtwo\LaravelWeclappApi\Models\SalesOrder;
 use Mindtwo\LaravelWeclappApi\Models\User;
 
+/**
+ * The lock RunsSyncDefinitions takes for an entity on the default connection.
+ */
+function syncLockKey(string $slug): string
+{
+    return 'weclapp-api:sync:'.DB::connection()->getDatabaseName().':'.$slug;
+}
+
 beforeEach(function () {
     config()->set('weclapp-api.base_url', 'https://tenant.weclapp.com/webapp/api/v2/');
     config()->set('weclapp-api.token', 'test-token');
@@ -755,7 +763,7 @@ describe('without an entity argument', function () {
                 ->push(['result' => []], 200),
             '*' => Http::response(['result' => []], 200),
         ]);
-        $held = Cache::lock('weclapp-api:sync:quotations', 60);
+        $held = Cache::lock(syncLockKey('quotations'), 60);
         $held->get();
 
         $this->artisan('weclapp:update')
@@ -777,8 +785,18 @@ describe('without an entity argument', function () {
 
         $this->artisan('weclapp:sync')->assertFailed();
 
-        expect(Cache::lock('weclapp-api:sync:quotations', 1)->get())->toBeTrue()
-            ->and(Cache::lock('weclapp-api:sync:articles', 1)->get())->toBeTrue();
+        expect(Cache::lock(syncLockKey('quotations'), 1)->get())->toBeTrue()
+            ->and(Cache::lock(syncLockKey('articles'), 1)->get())->toBeTrue();
+    });
+
+    it('is not blocked by a run holding the same entity for another database', function () {
+        Http::fake(['*' => Http::response(['result' => []], 200)]);
+        $held = Cache::lock('weclapp-api:sync:another_tenant:quotations', 60);
+        $held->get();
+
+        $this->artisan('weclapp:sync quotations')->assertSuccessful();
+
+        $held->release();
     });
 
     it('applies the same guard to the incremental update', function () {
