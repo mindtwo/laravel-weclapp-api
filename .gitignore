@@ -62,7 +62,7 @@ build/Release
 .pnpm-store
 jspm_packages
 node_modules
-vendor
+/vendor
 
 # TypeScript v1 declaration files
 typings
